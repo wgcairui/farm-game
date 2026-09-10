@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80" width="100" height="80">
+  <title>花坛</title>
+  <rect x="5" y="40" width="90" height="35" fill="#8b5a2b" stroke="#5d3a26" stroke-width="2" rx="3"/>
+  <rect x="8" y="43" width="84" height="29" fill="#5d3a26" rx="2"/>
+  <!-- 玫瑰 -->
+  <g transform="translate(20, 30)">
+    <circle r="5" fill="#e91e63"/>
+    <circle r="3" fill="#c2185b"/>
+  </g>
+  <g transform="translate(35, 25)">
+    <circle r="6" fill="#f06292"/>
+    <circle r="3" fill="#ec407a"/>
+  </g>
+  <g transform="translate(50, 30)">
+    <circle r="5" fill="#e91e63"/>
+  </g>
+  <g transform="translate(65, 28)">
+    <circle r="6" fill="#ad1457"/>
+    <circle r="3" fill="#880e4f"/>
+  </g>
+  <g transform="translate(80, 32)">
+    <circle r="5" fill="#ec407a"/>
+  </g>
+  <!-- 叶子 -->
+  <ellipse cx="15" cy="35" rx="3" ry="6" fill="#388e3c"/>
+  <ellipse cx="85" cy="35" rx="3" ry="6" fill="#388e3c"/>
+</svg>

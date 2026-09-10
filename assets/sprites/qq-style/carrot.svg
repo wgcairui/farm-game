@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" width="110" height="110">
+  <title>白萝卜·v2</title>
+  <!-- 叶子（3 瓣大叶） -->
+  <ellipse cx="55" cy="22" rx="28" ry="18" fill="#aed581" stroke="#3e2723" stroke-width="3"/>
+  <ellipse cx="30" cy="28" rx="18" ry="13" fill="#7cb342" stroke="#3e2723" stroke-width="3" transform="rotate(-25 30 28)"/>
+  <ellipse cx="80" cy="28" rx="18" ry="13" fill="#7cb342" stroke="#3e2723" stroke-width="3" transform="rotate(25 80 28)"/>
+  <!-- 叶脉 -->
+  <line x1="55" y1="8" x2="55" y2="36" stroke="#3e2723" stroke-width="2"/>
+  <line x1="30" y1="18" x2="30" y2="38" stroke="#3e2723" stroke-width="2"/>
+  <line x1="80" y1="18" x2="80" y2="38" stroke="#3e2723" stroke-width="2"/>
+  <!-- 萝卜根（粗三角） -->
+  <path d="M 35 40 L 55 105 L 75 40 Z" fill="#ff5722" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 萝卜纹（横线） -->
+  <line x1="40" y1="55" x2="70" y2="55" stroke="#3e2723" stroke-width="1.5" opacity="0.5"/>
+  <line x1="44" y1="70" x2="66" y2="70" stroke="#3e2723" stroke-width="1.5" opacity="0.5"/>
+  <line x1="48" y1="85" x2="62" y2="85" stroke="#3e2723" stroke-width="1.5" opacity="0.5"/>
+</svg>

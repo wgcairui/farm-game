@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>草莓·成熟</title>
+  <path d="M 40 32 L 30 44 L 35 54 L 45 54 L 50 44 Z" fill="#e91e63"/>
+  <ellipse cx="34" cy="30" rx="8" ry="3" fill="#43a047"/>
+  <ellipse cx="46" cy="30" rx="8" ry="3" fill="#43a047"/>
+  <circle cx="36" cy="44" r="1.5" fill="#fff"/>
+  <circle cx="44" cy="48" r="1.5" fill="#fff"/>
+  <circle cx="40" cy="40" r="1.5" fill="#fff"/>
+  <circle cx="38" cy="50" r="1.2" fill="#fff"/>
+  <circle cx="42" cy="44" r="1.2" fill="#fff"/>
+</svg>

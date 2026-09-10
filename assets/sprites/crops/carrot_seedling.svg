@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>胡萝卜·幼苗</title>
+  <ellipse cx="40" cy="46" rx="3" ry="6" fill="#bf360c" opacity="0.7"/>
+  <ellipse cx="36" cy="38" rx="6" ry="3" fill="#66bb6a" transform="rotate(-20 36 38)"/>
+  <ellipse cx="44" cy="38" rx="6" ry="3" fill="#66bb6a" transform="rotate(20 44 38)"/>
+</svg>

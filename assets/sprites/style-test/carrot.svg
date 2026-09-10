@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <title>白萝卜·手绘风</title>
+  <defs>
+  <linearGradient id="carrG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#ff7043"/>
+    <stop offset="100%" stop-color="#bf360c"/>
+  </linearGradient>
+
+  <linearGradient id="leafG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#a5d6a7"/>
+    <stop offset="100%" stop-color="#388e3c"/>
+  </linearGradient>
+  </defs>
+  <!-- 投影 -->
+  <ellipse cx="50" cy="92" rx="22" ry="3" fill="#000" opacity="0.2"/>
+  <!-- 萝卜叶（叠层） -->
+  <ellipse cx="35" cy="32" rx="14" ry="10" fill="url(#leafG)" transform="rotate(-25 35 32)"/>
+  <ellipse cx="50" cy="28" rx="16" ry="12" fill="url(#leafG)" transform="rotate(-5 50 28)"/>
+  <ellipse cx="65" cy="32" rx="14" ry="10" fill="url(#leafG)" transform="rotate(25 65 32)"/>
+  <!-- 萝卜主体（圆润） -->
+  <path d="M 30 42 Q 50 38 70 42 Q 72 50 70 60 Q 65 80 50 88 Q 35 80 30 60 Q 28 50 30 42 Z"
+        fill="url(#carrG)" stroke="#bf360c" stroke-width="1.5"/>
+  <!-- 高光 -->
+  <ellipse cx="42" cy="55" rx="5" ry="12" fill="#ffffff" opacity="0.4"/>
+  <!-- 纹理横线 -->
+  <g opacity="0.4" stroke="#bf360c" stroke-width="1" fill="none">
+    <path d="M 32 55 Q 50 53 68 55"/>
+    <path d="M 34 65 Q 50 63 66 65"/>
+    <path d="M 38 75 Q 50 73 62 75"/>
+  </g>
+</svg>

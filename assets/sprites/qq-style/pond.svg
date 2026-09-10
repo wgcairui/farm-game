@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160">
+  <title>池塘·v2</title>
+  <ellipse cx="120" cy="80" rx="105" ry="58" fill="#4fc3f7" stroke="#3e2723" stroke-width="3.5"/>
+  <!-- 水波 -->
+  <path d="M 50 60 Q 70 55 90 60" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.8"/>
+  <path d="M 100 80 Q 130 75 160 80" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.8"/>
+  <path d="M 140 100 Q 170 95 200 100" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.8"/>
+  <!-- 荷叶 1 -->
+  <ellipse cx="65" cy="65" rx="24" ry="8" fill="#7cb342" stroke="#3e2723" stroke-width="3"/>
+  <!-- 莲花 -->
+  <g>
+    <ellipse cx="65" cy="55" rx="7" ry="9" fill="#ec407a" stroke="#3e2723" stroke-width="2.5"/>
+    <circle cx="65" cy="55" r="3" fill="#fdd835" stroke="#3e2723" stroke-width="1.5"/>
+  </g>
+  <!-- 荷叶 2 -->
+  <ellipse cx="180" cy="95" rx="26" ry="9" fill="#7cb342" stroke="#3e2723" stroke-width="3"/>
+</svg>

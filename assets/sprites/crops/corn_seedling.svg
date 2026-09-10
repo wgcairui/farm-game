@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>玉米·幼苗</title>
+  <rect x="38" y="40" width="4" height="18" fill="#aed581"/>
+  <ellipse cx="34" cy="40" rx="5" ry="2" fill="#66bb6a" transform="rotate(-30 34 40)"/>
+  <ellipse cx="46" cy="40" rx="5" ry="2" fill="#66bb6a" transform="rotate(30 46 40)"/>
+</svg>

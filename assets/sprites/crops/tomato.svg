@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>番茄·成熟</title>
+  <circle cx="40" cy="42" r="12" fill="#e53935"/>
+  <ellipse cx="36" cy="34" rx="8" ry="4" fill="#43a047"/>
+  <ellipse cx="44" cy="34" rx="8" ry="4" fill="#43a047"/>
+  <ellipse cx="40" cy="36" rx="3" ry="2" fill="#ffcdd2"/>
+  <path d="M 40 32 L 38 36 L 42 36 Z" fill="#2e7d32"/>
+  <ellipse cx="36" cy="44" rx="2" ry="3" fill="#ffebee" opacity="0.6"/>
+</svg>

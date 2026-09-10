@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>玉米·成熟</title>
+  <rect x="36" y="28" width="8" height="32" rx="2" fill="#ffeb3b"/>
+  <rect x="34" y="24" width="12" height="6" rx="2" fill="#fff59d"/>
+  <g fill="#fff176" opacity="0.6">
+    <rect x="36" y="32" width="8" height="1.5"/>
+    <rect x="36" y="38" width="8" height="1.5"/>
+    <rect x="36" y="44" width="8" height="1.5"/>
+    <rect x="36" y="50" width="8" height="1.5"/>
+  </g>
+  <ellipse cx="32" cy="22" rx="6" ry="3" fill="#66bb6a" transform="rotate(-30 32 22)"/>
+  <ellipse cx="48" cy="22" rx="6" ry="3" fill="#66bb6a" transform="rotate(30 48 22)"/>
+</svg>

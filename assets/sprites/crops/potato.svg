@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>土豆·成熟</title>
+  <ellipse cx="34" cy="42" rx="9" ry="7" fill="#a1887f"/>
+  <ellipse cx="46" cy="42" rx="9" ry="7" fill="#8d6e63"/>
+  <ellipse cx="40" cy="48" rx="8" ry="6" fill="#6d4c41"/>
+  <circle cx="34" cy="40" r="1.5" fill="#5d4037"/>
+  <circle cx="44" cy="46" r="1.5" fill="#5d4037"/>
+  <ellipse cx="40" cy="34" rx="6" ry="3" fill="#81c784" opacity="0.7"/>
+</svg>

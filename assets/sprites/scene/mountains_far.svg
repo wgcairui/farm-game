@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 250" width="800" height="250">
+  <title>远山</title>
+  <path d="M 0 200 L 80 80 L 160 150 L 240 60 L 340 130 L 440 50 L 540 110 L 640 70 L 720 130 L 800 100 L 800 250 L 0 250 Z"
+        fill="#7ba85b" opacity="0.85"/>
+  <path d="M 0 220 L 100 150 L 200 200 L 320 140 L 440 190 L 560 150 L 680 200 L 800 170 L 800 250 L 0 250 Z"
+        fill="#5d8a3f" opacity="0.8"/>
+</svg>

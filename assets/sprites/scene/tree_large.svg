@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" width="120" height="160">
+  <title>大树</title>
+  <ellipse cx="60" cy="80" rx="50" ry="60" fill="#4caf50"/>
+  <ellipse cx="40" cy="60" rx="35" ry="40" fill="#66bb6a"/>
+  <ellipse cx="80" cy="70" rx="30" ry="35" fill="#66bb6a"/>
+  <ellipse cx="60" cy="100" rx="40" ry="45" fill="#388e3c"/>
+  <rect x="55" y="130" width="10" height="30" fill="#5d4037"/>
+  <ellipse cx="55" cy="135" rx="3" ry="2" fill="#3e2723"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" width="120" height="100">
+  <title>草地块·45° 斜俯·v2</title>
+  <!-- 上层（亮绿菱形） -->
+  <polygon points="60,15 110,40 60,65 10,40" fill="#9ccc65" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 右侧面（深绿阴影） -->
+  <polygon points="110,40 60,65 60,75 110,50" fill="#558b2f" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 底面（中绿） -->
+  <polygon points="10,40 60,65 60,75 10,50" fill="#7cb342" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 顶层草丛 -->
+  <g stroke="#3e2723" stroke-width="2" stroke-linecap="round">
+    <line x1="35" y1="35" x2="35" y2="42"/>
+    <line x1="40" y1="32" x2="42" y2="40"/>
+    <line x1="60" y1="28" x2="60" y2="38"/>
+    <line x1="80" y1="35" x2="80" y2="42"/>
+    <line x1="85" y1="32" x2="83" y2="40"/>
+  </g>
+  <!-- 小花 -->
+  <circle cx="50" cy="42" r="3" fill="#fdd835" stroke="#3e2723" stroke-width="1.5"/>
+  <circle cx="75" cy="48" r="2.5" fill="#ec407a" stroke="#3e2723" stroke-width="1.5"/>
+</svg>

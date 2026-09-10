@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>水壶</title>
+  <rect x="15" y="30" width="50" height="40" fill="#42a5f5" stroke="#1565c0" stroke-width="2" rx="4"/>
+  <rect x="15" y="28" width="50" height="6" fill="#1976d2" rx="2"/>
+  <rect x="60" y="20" width="20" height="14" fill="#42a5f5" stroke="#1565c0" stroke-width="2" rx="2"/>
+  <rect x="2" y="0" width="6" height="35" fill="#5d4037" rx="2"/>
+  <rect x="-5" y="0" width="20" height="6" fill="#5d4037" rx="2"/>
+  <text x="40" y="55" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">水</text>
+</svg>

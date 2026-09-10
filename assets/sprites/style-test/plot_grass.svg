@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <title>草地块·手绘风</title>
+  <defs>
+  <linearGradient id="grassPG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#9bd061"/>
+    <stop offset="100%" stop-color="#7ba85b"/>
+  </linearGradient>
+  </defs>
+  <!-- 投影 -->
+  <ellipse cx="50" cy="95" rx="40" ry="3" fill="#000" opacity="0.15"/>
+  <!-- 地块（圆角，不规则） -->
+  <path d="M 10 20 Q 8 15 14 12 L 86 10 Q 94 12 92 20 L 94 80 Q 92 90 84 90 L 16 92 Q 8 90 10 80 Z"
+        fill="url(#grassPG)" stroke="#5d8a3f" stroke-width="2"/>
+  <!-- 草簇 -->
+  <g stroke="#5d8a3f" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.7">
+    <path d="M 20 30 L 20 40 M 22 30 L 24 38"/>
+    <path d="M 40 25 L 40 36 M 42 25 L 44 34"/>
+    <path d="M 60 28 L 60 38 M 62 28 L 64 36"/>
+    <path d="M 80 30 L 80 40 M 78 30 L 76 38"/>
+    <path d="M 30 55 L 30 65 M 32 55 L 34 63"/>
+    <path d="M 70 60 L 70 70 M 68 60 L 66 68"/>
+  </g>
+  <!-- 小花点缀 -->
+  <circle cx="25" cy="70" r="2" fill="#ffeb3b"/>
+  <circle cx="75" cy="50" r="2" fill="#fff"/>
+  <circle cx="55" cy="75" r="2" fill="#ff8a80"/>
+</svg>

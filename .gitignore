@@ -1,0 +1,38 @@
+# Node / TypeScript
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cocos Creator
+library/
+temp/
+local/
+build/
+profiles/
+settings/
+native/engine/
+*.zip
+*.tgz
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ZCode 本地工作目录(规划文件、会话记录等)
+.zcode/
+
+# 设计稿(39 MB base64,体积过大不入库)
+design-preview/
+
+# AI 生成报告中的临时文件
+/tmp/
+
+# 环境
+.env
+.env.local

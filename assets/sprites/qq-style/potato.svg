@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" width="110" height="110">
+  <title>土豆·v2</title>
+  <!-- 主土豆 -->
+  <ellipse cx="55" cy="60" rx="40" ry="32" fill="#a1887f" stroke="#3e2723" stroke-width="3"/>
+  <!-- 凸起（土豆不规则形状） -->
+  <ellipse cx="35" cy="50" rx="15" ry="12" fill="#a1887f" stroke="#3e2723" stroke-width="2.5"/>
+  <ellipse cx="75" cy="65" rx="17" ry="13" fill="#a1887f" stroke="#3e2723" stroke-width="2.5"/>
+  <ellipse cx="55" cy="80" rx="14" ry="10" fill="#a1887f" stroke="#3e2723" stroke-width="2.5"/>
+  <!-- 芽眼 -->
+  <circle cx="38" cy="48" r="2.5" fill="#5d4037"/>
+  <circle cx="60" cy="58" r="2.5" fill="#5d4037"/>
+  <circle cx="72" cy="50" r="2.5" fill="#5d4037"/>
+  <circle cx="45" cy="68" r="2" fill="#5d4037"/>
+  <!-- 顶部小芽 -->
+  <path d="M 48 30 L 55 42 L 62 30" fill="#7cb342" stroke="#3e2723" stroke-width="2.5"/>
+</svg>

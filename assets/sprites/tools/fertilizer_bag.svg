@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 80" width="60" height="80">
+  <title>化肥袋</title>
+  <ellipse cx="30" cy="15" rx="20" ry="8" fill="#a1887f"/>
+  <path d="M 10 15 L 10 70 Q 30 78 50 70 L 50 15" fill="#fff59d" stroke="#8b5a2b" stroke-width="2"/>
+  <ellipse cx="30" cy="15" rx="20" ry="6" fill="#fff59d" stroke="#8b5a2b" stroke-width="2"/>
+  <text x="30" y="45" text-anchor="middle" fill="#5d3a26" font-size="14" font-weight="bold">化肥</text>
+  <text x="30" y="62" text-anchor="middle" fill="#e53935" font-size="10" font-weight="bold">+30%</text>
+</svg>

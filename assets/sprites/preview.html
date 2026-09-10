@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Sprites Preview v2 · Farm Game</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #fff8e1; padding: 24px; color: #3e2723; }
+  h1 { margin-bottom: 8px; color: #5d3a26; }
+  .subtitle { color: #8b5a2b; margin-bottom: 24px; }
+  h2 { margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #ff7043; color: #5d3a26; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+  .card { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border: 2px solid #d4b878; }
+  .card img { width: 80px; height: 80px; object-fit: contain; }
+  .card.wide img { width: 200px; height: auto; }
+  .card.tall img { width: 80px; height: 100px; }
+  .card .name { font-size: 13px; font-weight: 700; margin-top: 8px; color: #3e2723; }
+  .card .file { font-size: 11px; color: #a1887f; font-family: monospace; margin-top: 4px; word-break: break-all; }
+  .nav { background: #5d3a26; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 24px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>🌾 Farm Game · 素材预览 v2（参照物对齐）</h1>
+<div class="subtitle">基于参照物重制：场景层 / 建筑物 / 装饰 / 工具 / UI 共 38+ 个 SVG</div>
+
+<div class="nav">
+目录索引：<a href="#scene" style="color:#ffc107">场景层</a> ·
+<a href="#plots" style="color:#ffc107">地块</a> ·
+<a href="#buildings" style="color:#ffc107">建筑</a> ·
+<a href="#animals" style="color:#ffc107">动物/装饰</a> ·
+<a href="#crops" style="color:#ffc107">作物</a> ·
+<a href="#quality" style="color:#ffc107">品质色</a> ·
+<a href="#tools" style="color:#ffc107">工具</a> ·
+<a href="#ui" style="color:#ffc107">UI</a>
+</div>
+
+<h2 id="scene">🌅 场景层（参照物核心）</h2>
+<div class="grid">
+  <div class="card tall"><img src="scene/sky_gradient.svg" style="width:120px;height:80px"><div class="name">天空渐变</div><div class="file">sky_gradient.svg</div></div>
+  <div class="card"><img src="scene/cloud_a.svg" style="width:100px;height:50px"><div class="name">云朵 A</div><div class="file">cloud_a.svg</div></div>
+  <div class="card"><img src="scene/cloud_b.svg" style="width:80px;height:40px"><div class="name">云朵 B</div><div class="file">cloud_b.svg</div></div>
+  <div class="card wide"><img src="scene/mountains_far.svg" style="width:200px;height:60px"><div class="name">远山</div><div class="file">mountains_far.svg</div></div>
+  <div class="card"><img src="scene/tree_large.svg"><div class="name">大树</div><div class="file">tree_large.svg</div></div>
+  <div class="card"><img src="scene/tree_conifer.svg"><div class="name">针叶树</div><div class="file">tree_conifer.svg</div></div>
+  <div class="card wide"><img src="scene/pond.svg" style="width:120px;height:80px"><div class="name">池塘</div><div class="file">pond.svg</div></div>
+  <div class="card wide"><img src="scene/grass_tile.svg" style="width:160px;height:120px"><div class="name">草坪</div><div class="file">grass_tile.svg</div></div>
+  <div class="card"><img src="path/stone_path.svg" style="width:120px;height:60px"><div class="name">鹅卵石路</div><div class="file">stone_path.svg</div></div>
+</div>
+
+<h2 id="plots">🟫 地块（v2 双形态）</h2>
+<div class="grid">
+  <div class="card"><img src="plots-v2/plot_grass.svg"><div class="name">草地菱形</div><div class="file">plot_grass.svg</div></div>
+  <div class="card"><img src="plots-v2/plot_dirt.svg"><div class="name">棕色翻耕</div><div class="file">plot_dirt.svg</div></div>
+  <div class="card"><img src="plots-v2/plot_locked.svg"><div class="name">未解锁</div><div class="file">plot_locked.svg</div></div>
+</div>
+
+<h2 id="buildings">🏠 建筑物</h2>
+<div class="grid">
+  <div class="card wide"><img src="buildings/cottage.svg" style="width:140px;height:140px"><div class="name">草屋</div><div class="file">cottage.svg</div></div>
+  <div class="card"><img src="buildings/dog_house.svg"><div class="name">狗屋</div><div class="file">dog_house.svg</div></div>
+  <div class="card"><img src="buildings/scarecrow.svg"><div class="name">稻草人</div><div class="file">scarecrow.svg</div></div>
+  <div class="card"><img src="buildings/sign_board.svg"><div class="name">木牌</div><div class="file">sign_board.svg</div></div>
+</div>
+
+<h2 id="animals">🐰 动物 / 装饰</h2>
+<div class="grid">
+  <div class="card"><img src="animals/rabbit.svg"><div class="name">兔子</div><div class="file">rabbit.svg</div></div>
+  <div class="card"><img src="animals/butterfly.svg"><div class="name">蝴蝶</div><div class="file">butterfly.svg</div></div>
+  <div class="card"><img src="animals/cart.svg"><div class="name">木推车</div><div class="file">cart.svg</div></div>
+  <div class="card wide"><img src="decor/fence_wooden.svg" style="width:120px;height:80px"><div class="name">木栅栏</div><div class="file">fence_wooden.svg</div></div>
+  <div class="card wide"><img src="decor/flower_bed.svg" style="width:120px;height:80px"><div class="name">花坛</div><div class="file">flower_bed.svg</div></div>
+</div>
+
+<h2 id="crops">🌱 作物（v1 原版）</h2>
+<div class="grid">
+  <div class="card"><img src="crops/carrot.svg"><div class="name">白萝卜·成熟</div><div class="file">carrot.svg</div></div>
+  <div class="card"><img src="crops/potato.svg"><div class="name">土豆·成熟</div><div class="file">potato.svg</div></div>
+  <div class="card"><img src="crops/corn.svg"><div class="name">玉米·成熟</div><div class="file">corn.svg</div></div>
+  <div class="card"><img src="crops/tomato.svg"><div class="name">番茄·成熟</div><div class="file">tomato.svg</div></div>
+  <div class="card"><img src="crops/strawberry.svg"><div class="name">草莓·成熟</div><div class="file">strawberry.svg</div></div>
+</div>
+
+<h2 id="quality">🏷 品质色板（6 级）</h2>
+<div class="grid">
+  <div class="card wide"><img src="crops-quality/quality_palette.svg" style="width:320px;height:60px"><div class="name">品质色板 1-6 品</div><div class="file">quality_palette.svg</div></div>
+</div>
+
+<h2 id="tools">🧰 工具</h2>
+<div class="grid">
+  <div class="card"><img src="tools/fertilizer_bag.svg"><div class="name">化肥袋</div><div class="file">fertilizer_bag.svg</div></div>
+  <div class="card"><img src="tools/shovel.svg"><div class="name">铲子</div><div class="file">shovel.svg</div></div>
+  <div class="card"><img src="tools/watering_can.svg"><div class="name">水壶</div><div class="file">watering_can.svg</div></div>
+  <div class="card"><img src="tools/hay_basket.svg"><div class="name">稻草筐</div><div class="file">hay_basket.svg</div></div>
+</div>
+
+<h2 id="ui">🎨 UI 元素</h2>
+<div class="grid">
+  <div class="card"><img src="ui/avatar_lion.svg"><div class="name">狮子头像</div><div class="file">avatar_lion.svg</div></div>
+  <div class="card"><img src="ui/tab_inventory.svg"><div class="name">Tab·仓库</div><div class="file">tab_inventory.svg</div></div>
+  <div class="card"><img src="ui/tab_shop.svg"><div class="name">Tab·商店</div><div class="file">tab_shop.svg</div></div>
+  <div class="card"><img src="ui/tab_pet.svg"><div class="name">Tab·宠物</div><div class="file">tab_pet.svg</div></div>
+  <div class="card"><img src="ui/tab_decor.svg"><div class="name">Tab·装扮</div><div class="file">tab_decor.svg</div></div>
+  <div class="card"><img src="ui/tab_friend.svg"><div class="name">Tab·好友</div><div class="file">tab_friend.svg</div></div>
+  <div class="card wide"><img src="ui/crop_bubble.svg" style="width:200px;height:80px"><div class="name">作物气泡</div><div class="file">crop_bubble.svg</div></div>
+</div>
+
+</body>
+</html>

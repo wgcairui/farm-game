@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" width="80" height="60">
+  <title>地块·可收获（高亮）</title>
+  <defs>
+    <radialGradient id="soilReady" cx="50%" cy="40%">
+      <stop offset="0%" stop-color="#cd8c52"/>
+      <stop offset="100%" stop-color="#8b5a3c"/>
+    </radialGradient>
+  </defs>
+  <polygon points="0,30 40,10 80,30 40,50" fill="url(#soilReady)" stroke="#3e2618" stroke-width="2"/>
+  <!-- 高亮外框 -->
+  <polygon points="0,30 40,10 80,30 40,50" fill="none" stroke="#ffc107" stroke-width="2" opacity="0.6"/>
+</svg>

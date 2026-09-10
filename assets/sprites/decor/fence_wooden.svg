@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="120" height="80">
+  <title>木栅栏</title>
+  <g stroke="#8b5a2b" stroke-width="2.5">
+    <!-- 立柱 -->
+    <rect x="10" y="30" width="8" height="50" fill="#a47148" rx="1"/>
+    <rect x="36" y="30" width="8" height="50" fill="#a47148" rx="1"/>
+    <rect x="62" y="30" width="8" height="50" fill="#a47148" rx="1"/>
+    <rect x="88" y="30" width="8" height="50" fill="#a47148" rx="1"/>
+    <rect x="108" y="30" width="8" height="50" fill="#a47148" rx="1"/>
+    <!-- 横木 -->
+    <rect x="0" y="40" width="120" height="6" fill="#8b5a2b" rx="1"/>
+    <rect x="0" y="60" width="120" height="6" fill="#8b5a2b" rx="1"/>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>胡萝卜·成熟</title>
+  <ellipse cx="32" cy="22" rx="8" ry="6" fill="#66bb6a"/>
+  <ellipse cx="48" cy="22" rx="8" ry="6" fill="#66bb6a"/>
+  <ellipse cx="40" cy="40" rx="8" ry="14" fill="#ff7043"/>
+  <path d="M 30 50 Q 40 56 50 50" stroke="#bf360c" stroke-width="1" fill="none" opacity="0.4"/>
+</svg>

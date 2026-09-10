@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" width="110" height="110">
+  <title>玉米·v2</title>
+  <!-- 顶部双叶 -->
+  <path d="M 30 20 L 22 5 L 38 14 Z" fill="#7cb342" stroke="#3e2723" stroke-width="2.5"/>
+  <path d="M 80 20 L 88 5 L 72 14 Z" fill="#7cb342" stroke="#3e2723" stroke-width="2.5"/>
+  <!-- 外壳 -->
+  <path d="M 28 22 Q 24 65 38 95 L 72 95 Q 86 65 82 22 Z"
+        fill="#f9a825" stroke="#3e2723" stroke-width="3"/>
+  <!-- 玉米粒（点阵，更密） -->
+  <g fill="#ffee58" stroke="#3e2723" stroke-width="1.5">
+    <ellipse cx="40" cy="38" rx="4" ry="5"/>
+    <ellipse cx="55" cy="35" rx="4" ry="5"/>
+    <ellipse cx="70" cy="38" rx="4" ry="5"/>
+    <ellipse cx="46" cy="50" rx="4" ry="5"/>
+    <ellipse cx="64" cy="50" rx="4" ry="5"/>
+    <ellipse cx="40" cy="62" rx="4" ry="5"/>
+    <ellipse cx="55" cy="60" rx="4" ry="5"/>
+    <ellipse cx="70" cy="62" rx="4" ry="5"/>
+    <ellipse cx="46" cy="75" rx="4" ry="5"/>
+    <ellipse cx="64" cy="75" rx="4" ry="5"/>
+    <ellipse cx="55" cy="85" rx="4" ry="5"/>
+  </g>
+</svg>

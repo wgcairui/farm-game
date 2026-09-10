@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>草莓·幼苗</title>
+  <ellipse cx="40" cy="48" rx="3" ry="2" fill="#e91e63" opacity="0.6"/>
+  <ellipse cx="36" cy="44" rx="5" ry="2" fill="#66bb6a" transform="rotate(-30 36 44)"/>
+  <ellipse cx="44" cy="44" rx="5" ry="2" fill="#66bb6a" transform="rotate(30 44 44)"/>
+  <ellipse cx="40" cy="40" rx="4" ry="2" fill="#43a047"/>
+</svg>

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <title>头像·小农夫</title>
+  <defs>
+  <linearGradient id="hatG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#a47148"/>
+    <stop offset="100%" stop-color="#3e2618"/>
+  </linearGradient>
+
+  <linearGradient id="faceG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#ffccbc"/>
+    <stop offset="100%" stop-color="#d4a373"/>
+  </linearGradient>
+
+  <linearGradient id="bodyG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#a47148"/>
+    <stop offset="100%" stop-color="#bf360c"/>
+  </linearGradient>
+
+  <linearGradient id="hairG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#5d4037"/>
+    <stop offset="100%" stop-color="#3e2618"/>
+  </linearGradient>
+  </defs>
+  <!-- 边框（参照物风格） -->
+  <circle cx="50" cy="50" r="48" fill="#f5e6c8" stroke="#d4a857" stroke-width="3"/>
+  <!-- 阴影 -->
+  <ellipse cx="50" cy="92" rx="18" ry="3" fill="#000" opacity="0.15"/>
+
+  <!-- 身体 -->
+  <rect x="30" y="65" width="40" height="30" fill="url(#bodyG)" rx="4"/>
+  <path d="M 30 75 L 70 75" stroke="#fff" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- 脖子 -->
+  <rect x="44" y="60" width="12" height="8" fill="url(#faceG)"/>
+
+  <!-- 脸 -->
+  <ellipse cx="50" cy="45" rx="20" ry="22" fill="url(#faceG)" stroke="#8d5524" stroke-width="1"/>
+
+  <!-- 头发 -->
+  <path d="M 30 38 Q 30 25 50 22 Q 70 25 70 38 Q 70 32 60 30 Q 50 28 40 30 Q 30 32 30 38 Z" fill="url(#hairG)"/>
+
+  <!-- 草帽 -->
+  <ellipse cx="50" cy="28" rx="28" ry="6" fill="url(#hatG)"/>
+  <path d="M 38 28 Q 38 12 50 10 Q 62 12 62 28" fill="url(#hatG)" stroke="#3e2618" stroke-width="1"/>
+  <!-- 帽带 -->
+  <rect x="38" y="26" width="24" height="3" fill="#f0b400"/>
+
+  <!-- 眼睛 -->
+  <ellipse cx="42" cy="46" rx="2.5" ry="3" fill="#3e2723"/>
+  <ellipse cx="58" cy="46" rx="2.5" ry="3" fill="#3e2723"/>
+  <circle cx="42.5" cy="45" r="1" fill="#ffffff"/>
+  <circle cx="58.5" cy="45" r="1" fill="#ffffff"/>
+
+  <!-- 腮红 -->
+  <ellipse cx="36" cy="52" rx="4" ry="2" fill="#ff8a80" opacity="0.6"/>
+  <ellipse cx="64" cy="52" rx="4" ry="2" fill="#ff8a80" opacity="0.6"/>
+
+  <!-- 嘴 -->
+  <path d="M 44 54 Q 50 58 56 54" stroke="#3e2723" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

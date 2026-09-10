@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>地块·未解锁</title>
+  <defs>
+    <linearGradient id="grassLock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8d56a"/>
+      <stop offset="100%" stop-color="#7ba85b"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="76" height="76" rx="12" fill="url(#grassLock)" stroke="#558b2f" stroke-width="2"/>
+  <!-- 锁 -->
+  <circle cx="40" cy="40" r="22" fill="#000" opacity="0.5"/>
+  <circle cx="40" cy="40" r="16" fill="#fff" opacity="0.9"/>
+  <text x="40" y="48" text-anchor="middle" fill="#5d4037" font-size="20" font-weight="bold">🔒</text>
+</svg>

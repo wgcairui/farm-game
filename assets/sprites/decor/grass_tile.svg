@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <title>草地平铺</title>
+  <defs>
+    <pattern id="grassTile" patternUnits="userSpaceOnUse" width="60" height="60">
+      <rect width="60" height="60" fill="#a8d56a"/>
+      <circle cx="15" cy="20" r="2" fill="#8bc34a" opacity="0.5"/>
+      <circle cx="45" cy="40" r="2" fill="#8bc34a" opacity="0.5"/>
+      <circle cx="35" cy="10" r="1.5" fill="#7cb342" opacity="0.4"/>
+      <circle cx="55" cy="25" r="1.5" fill="#7cb342" opacity="0.4"/>
+    </pattern>
+  </defs>
+  <rect width="60" height="60" fill="url(#grassTile)"/>
+</svg>

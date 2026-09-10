@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80" width="100" height="80">
+  <title>木推车</title>
+  <rect x="10" y="30" width="60" height="35" fill="#a47148" stroke="#5d3a26" stroke-width="2" rx="2"/>
+  <rect x="5" y="25" width="70" height="8" fill="#8b5a2b" rx="2"/>
+  <line x1="20" y1="30" x2="20" y2="65" stroke="#5d3a26" stroke-width="1.5"/>
+  <line x1="40" y1="30" x2="40" y2="65" stroke="#5d3a26" stroke-width="1.5"/>
+  <line x1="60" y1="30" x2="60" y2="65" stroke="#5d3a26" stroke-width="1.5"/>
+  <circle cx="25" cy="70" r="8" fill="#3e2618"/>
+  <circle cx="25" cy="70" r="4" fill="#a47148"/>
+  <circle cx="65" cy="70" r="8" fill="#3e2618"/>
+  <circle cx="65" cy="70" r="4" fill="#a47148"/>
+  <line x1="70" y1="55" x2="95" y2="40" stroke="#5d3a26" stroke-width="3"/>
+</svg>

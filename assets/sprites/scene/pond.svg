@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140" width="200" height="140">
+  <title>池塘</title>
+  <defs>
+    <radialGradient id="pondGrad" cx="50%" cy="40%">
+      <stop offset="0%" stop-color="#7ec0e8"/>
+      <stop offset="100%" stop-color="#1976d2"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="100" cy="70" rx="90" ry="50" fill="url(#pondGrad)" stroke="#5d4037" stroke-width="3"/>
+  <ellipse cx="100" cy="65" rx="75" ry="35" fill="#7ec0e8" opacity="0.7"/>
+  <!-- 荷叶 -->
+  <ellipse cx="60" cy="55" rx="15" ry="6" fill="#66bb6a"/>
+  <ellipse cx="140" cy="80" rx="18" ry="7" fill="#66bb6a"/>
+  <!-- 荷花 -->
+  <circle cx="70" cy="50" r="4" fill="#ffcdd2"/>
+  <circle cx="70" cy="50" r="2" fill="#fff"/>
+  <!-- 高光 -->
+  <ellipse cx="80" cy="50" rx="20" ry="3" fill="#fff" opacity="0.6"/>
+  <ellipse cx="140" cy="75" rx="25" ry="3" fill="#fff" opacity="0.4"/>
+</svg>

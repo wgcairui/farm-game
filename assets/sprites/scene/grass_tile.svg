@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <title>草坪</title>
+  <defs>
+    <linearGradient id="grassGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9bd061"/>
+      <stop offset="100%" stop-color="#6fa83c"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#grassGrad)"/>
+  <!-- 草丛 -->
+  <g opacity="0.6">
+    <path d="M 50 100 L 50 90 M 55 100 L 58 88 M 60 100 L 60 92" stroke="#558b2f" stroke-width="2" fill="none"/>
+    <path d="M 200 150 L 200 140 M 205 150 L 208 138 M 210 150 L 210 142" stroke="#558b2f" stroke-width="2" fill="none"/>
+    <path d="M 600 200 L 600 190 M 605 200 L 608 188 M 610 200 L 610 192" stroke="#558b2f" stroke-width="2" fill="none"/>
+    <path d="M 100 400 L 100 390 M 105 400 L 108 388 M 110 400 L 110 392" stroke="#558b2f" stroke-width="2" fill="none"/>
+    <path d="M 700 500 L 700 490 M 705 500 L 708 488 M 710 500 L 710 492" stroke="#558b2f" stroke-width="2" fill="none"/>
+  </g>
+  <!-- 小花 -->
+  <g>
+    <g transform="translate(80, 200)">
+      <circle r="4" fill="#ffe066"/>
+      <circle cx="-4" cy="-4" r="3" fill="#fff59d"/>
+      <circle cx="4" cy="-4" r="3" fill="#fff59d"/>
+      <circle cx="-4" cy="4" r="3" fill="#fff59d"/>
+      <circle cx="4" cy="4" r="3" fill="#fff59d"/>
+    </g>
+    <g transform="translate(720, 150)">
+      <circle r="4" fill="#ff9966"/>
+      <circle cx="-4" cy="-4" r="3" fill="#ffab91"/>
+      <circle cx="4" cy="-4" r="3" fill="#ffab91"/>
+      <circle cx="-4" cy="4" r="3" fill="#ffab91"/>
+      <circle cx="4" cy="4" r="3" fill="#ffab91"/>
+    </g>
+    <g transform="translate(150, 500)">
+      <circle r="4" fill="#ffe066"/>
+      <circle cx="-4" cy="-4" r="3" fill="#fff59d"/>
+      <circle cx="4" cy="-4" r="3" fill="#fff59d"/>
+      <circle cx="-4" cy="4" r="3" fill="#fff59d"/>
+      <circle cx="4" cy="4" r="3" fill="#fff59d"/>
+    </g>
+    <g transform="translate(680, 450)">
+      <circle r="4" fill="#ff9966"/>
+      <circle cx="-4" cy="-4" r="3" fill="#ffab91"/>
+      <circle cx="4" cy="-4" r="3" fill="#ffab91"/>
+      <circle cx="-4" cy="4" r="3" fill="#ffab91"/>
+      <circle cx="4" cy="4" r="3" fill="#ffab91"/>
+    </g>
+  </g>
+</svg>

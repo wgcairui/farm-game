@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 100" width="240" height="100">
+  <title>作物气泡（参照物）</title>
+  <rect x="0" y="0" width="240" height="90" fill="#fff" stroke="#a47148" stroke-width="3" rx="14"/>
+  <!-- 1/1 角标 -->
+  <text x="14" y="20" fill="#5d3a26" font-size="11" font-weight="bold">1/1</text>
+  <!-- 作物图标占位 -->
+  <circle cx="120" cy="35" r="22" fill="#ffeb3b"/>
+  <text x="120" y="42" text-anchor="middle" font-size="22">🌽</text>
+  <!-- 进度条 -->
+  <rect x="20" y="62" width="200" height="8" fill="#d4b878" rx="4"/>
+  <rect x="20" y="62" width="120" height="8" fill="url(#progGrad)" rx="4"/>
+  <defs>
+    <linearGradient id="progGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#66bb6a"/>
+      <stop offset="100%" stop-color="#8bc34a"/>
+    </linearGradient>
+  </defs>
+  <!-- 倒计时 -->
+  <text x="120" y="86" text-anchor="middle" fill="#5d3a26" font-size="11" font-weight="bold">00:46:58 后成熟</text>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>土豆·幼苗</title>
+  <rect x="38" y="44" width="4" height="14" fill="#a1887f" opacity="0.6"/>
+  <ellipse cx="36" cy="40" rx="5" ry="3" fill="#81c784" transform="rotate(-25 36 40)"/>
+  <ellipse cx="44" cy="40" rx="5" ry="3" fill="#81c784" transform="rotate(25 44 40)"/>
+</svg>

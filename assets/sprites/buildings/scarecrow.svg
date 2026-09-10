@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" width="120" height="160">
+  <title>稻草人</title>
+  <!-- 头 -->
+  <circle cx="60" cy="20" r="12" fill="#ffeb3b"/>
+  <ellipse cx="60" cy="13" rx="16" ry="3" fill="#5d4037"/>
+  <rect x="50" y="3" width="20" height="12" fill="#5d4037" rx="2"/>
+  <!-- 眼睛 -->
+  <circle cx="55" cy="20" r="1.5" fill="#000"/>
+  <circle cx="65" cy="20" r="1.5" fill="#000"/>
+  <!-- 嘴 -->
+  <path d="M 55 25 Q 60 28 65 25" stroke="#000" stroke-width="1.5" fill="none"/>
+  <!-- 身体 -->
+  <rect x="44" y="32" width="32" height="42" fill="#ff9800" rx="2"/>
+  <!-- 横木 -->
+  <rect x="20" y="48" width="80" height="6" fill="#6d4c41"/>
+  <!-- 木桩 -->
+  <rect x="58" y="74" width="4" height="80" fill="#6d4c41"/>
+  <!-- 衣服纹理 -->
+  <g opacity="0.5">
+    <line x1="60" y1="32" x2="60" y2="74" stroke="#bf360c" stroke-width="1"/>
+    <rect x="44" y="55" width="32" height="3" fill="#f57c00"/>
+  </g>
+</svg>

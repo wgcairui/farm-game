@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <title>蝴蝶</title>
+  <ellipse cx="20" cy="20" rx="12" ry="10" fill="#ff7043"/>
+  <ellipse cx="40" cy="20" rx="12" ry="10" fill="#ff7043"/>
+  <ellipse cx="22" cy="38" rx="10" ry="8" fill="#ffa726"/>
+  <ellipse cx="38" cy="38" rx="10" ry="8" fill="#ffa726"/>
+  <ellipse cx="20" cy="20" rx="5" ry="4" fill="#fff" opacity="0.7"/>
+  <ellipse cx="40" cy="20" rx="5" ry="4" fill="#fff" opacity="0.7"/>
+  <ellipse cx="30" cy="30" rx="2" ry="12" fill="#5d3a26"/>
+  <line x1="30" y1="18" x2="25" y2="10" stroke="#5d3a26" stroke-width="1.5"/>
+  <line x1="30" y1="18" x2="35" y2="10" stroke="#5d3a26" stroke-width="1.5"/>
+</svg>

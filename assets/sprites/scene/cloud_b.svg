@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80" width="160" height="80">
+  <title>云朵 B</title>
+  <g fill="#ffffff" opacity="0.95">
+    <ellipse cx="30" cy="50" rx="25" ry="18"/>
+    <ellipse cx="65" cy="40" rx="32" ry="22"/>
+    <ellipse cx="100" cy="48" rx="28" ry="20"/>
+    <ellipse cx="135" cy="55" rx="22" ry="16"/>
+  </g>
+  <g fill="#ffffff" opacity="0.7">
+    <ellipse cx="80" cy="62" rx="40" ry="10"/>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>Tab·商店</title>
+  <circle cx="40" cy="40" r="35" fill="#aed581" stroke="#558b2f" stroke-width="3"/>
+  <rect x="15" y="35" width="50" height="32" fill="#fff59d" stroke="#8b5a2b" stroke-width="2" rx="3"/>
+  <path d="M 15 35 L 25 22 L 55 22 L 65 35" fill="#f4d56e" stroke="#8b5a2b" stroke-width="2"/>
+  <circle cx="30" cy="48" r="5" fill="#e91e63"/>
+  <circle cx="50" cy="50" r="6" fill="#ff7043"/>
+</svg>

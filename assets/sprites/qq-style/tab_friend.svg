@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <circle cx="40" cy="40" r="36" fill="#fff8e1" stroke="#3e2723" stroke-width="3"/>
+  <!-- 信封 -->
+  <rect x="18" y="28" width="44" height="32" fill="#ffffff" stroke="#3e2723" stroke-width="2.5"/>
+  <path d="M 18 28 L 40 48 L 62 28" fill="none" stroke="#3e2723" stroke-width="2.5"/>
+  <!-- 红心 -->
+  <path d="M 56 22 Q 50 22 48 26 Q 48 30 56 36 Q 64 30 64 26 Q 62 22 56 22 Z" fill="#e53935" stroke="#3e2723" stroke-width="1.5"/>
+</svg>

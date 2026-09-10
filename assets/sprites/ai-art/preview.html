@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI 出图资源预览 · minimax</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #5d3a26; padding: 24px; color: #fff; margin: 0; }
+  h1 { margin-bottom: 8px; }
+  .subtitle { color: #d4b878; margin-bottom: 32px; }
+  h2 { margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #ff7043; color: #ffc107; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .card { background: #f5e6c8; border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); border: 3px solid #d4b878; }
+  .card img { width: 160px; height: 160px; object-fit: contain; background: #fff; border-radius: 8px; }
+  .card.wide img { width: 220px; height: 130px; }
+  .card .name { font-size: 14px; font-weight: 800; color: #5d3a26; margin-top: 8px; }
+  .card .file { font-size: 11px; color: #8b5a2b; font-family: monospace; margin-top: 4px; word-break: break-all; }
+  .nav { background: rgba(255,255,255,0.1); padding: 12px 16px; border-radius: 8px; margin-bottom: 24px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>🎨 AI 出图资源（minimax · 漫画风格）</h1>
+<div class="subtitle">34 张 1024×1024 PNG · AI 生成 · 风格 = QQ农场卡通向</div>
+
+<div class="nav">
+📌 <b>说明</b>：这些图都带场景背景（不是纯白），适合放在固定场景里使用。如果要透明背景，需要重出图（强化 prompt "pure white background, isolated object"）。
+</div>
+
+<h2>🌱 作物（5）</h2>
+<div class="grid">
+  <div class="card"><img src="crops/carrot.png"><div class="name">白萝卜</div><div class="file">crops/carrot.png</div></div>
+  <div class="card"><img src="crops/potato.png"><div class="name">土豆</div><div class="file">crops/potato.png</div></div>
+  <div class="card"><img src="crops/corn.png"><div class="name">玉米</div><div class="file">crops/corn.png</div></div>
+  <div class="card"><img src="crops/tomato.png"><div class="name">番茄</div><div class="file">crops/tomato.png</div></div>
+  <div class="card"><img src="crops/strawberry.png"><div class="name">草莓</div><div class="file">crops/strawberry.png</div></div>
+</div>
+
+<h2>🏠 建筑物（4）</h2>
+<div class="grid">
+  <div class="card"><img src="buildings/cottage.png"><div class="name">草屋</div><div class="file">buildings/cottage.png</div></div>
+  <div class="card"><img src="buildings/dog_house.png"><div class="name">狗屋</div><div class="file">buildings/dog_house.png</div></div>
+  <div class="card"><img src="buildings/scarecrow.png"><div class="name">稻草人</div><div class="file">buildings/scarecrow.png</div></div>
+  <div class="card"><img src="buildings/sign_board.png"><div class="name">木牌</div><div class="file">buildings/sign_board.png</div></div>
+</div>
+
+<h2>🟫 地块（3 · API误识别画了小屋，需重出）</h2>
+<div class="grid">
+  <div class="card"><img src="plots/plot_grass.png"><div class="name">草地块</div><div class="file">plots/plot_grass.png</div></div>
+  <div class="card"><img src="plots/plot_dirt.png"><div class="name">翻耕地块</div><div class="file">plots/plot_dirt.png</div></div>
+  <div class="card"><img src="plots/plot_seedling.png"><div class="name">幼苗地块</div><div class="file">plots/plot_seedling.png</div></div>
+</div>
+
+<h2>🌅 场景（4）</h2>
+<div class="grid">
+  <div class="card wide"><img src="scene/sky_background.png"><div class="name">天空背景</div><div class="file">scene/sky_background.png</div></div>
+  <div class="card"><img src="scene/grass_tile.png"><div class="name">草地</div><div class="file">scene/grass_tile.png</div></div>
+  <div class="card wide"><img src="scene/pond.png"><div class="name">池塘</div><div class="file">scene/pond.png</div></div>
+  <div class="card wide"><img src="scene/stone_path.png"><div class="name">鹅卵石路</div><div class="file">scene/stone_path.png</div></div>
+</div>
+
+<h2>🐰 装饰（6）</h2>
+<div class="grid">
+  <div class="card"><img src="decor/rabbit.png"><div class="name">兔子</div><div class="file">decor/rabbit.png</div></div>
+  <div class="card"><img src="decor/butterfly.png"><div class="name">蝴蝶</div><div class="file">decor/butterfly.png</div></div>
+  <div class="card wide"><img src="decor/fence.png"><div class="name">木栅栏</div><div class="file">decor/fence.png</div></div>
+  <div class="card wide"><img src="decor/flower_bed.png"><div class="name">花坛</div><div class="file">decor/flower_bed.png</div></div>
+  <div class="card wide"><img src="decor/wooden_cart.png"><div class="name">木推车</div><div class="file">decor/wooden_cart.png</div></div>
+  <div class="card"><img src="decor/small_chicken.png"><div class="name">小鸡</div><div class="file">decor/small_chicken.png</div></div>
+</div>
+
+<h2>🎨 UI（10）</h2>
+<div class="grid">
+  <div class="card"><img src="ui/avatar_farmer.png"><div class="name">小农夫头像</div><div class="file">ui/avatar_farmer.png</div></div>
+  <div class="card"><img src="ui/avatar_girl.png"><div class="name">小农女头像</div><div class="file">ui/avatar_girl.png</div></div>
+  <div class="card"><img src="ui/tab_inventory.png"><div class="name">Tab·仓库</div><div class="file">ui/tab_inventory.png</div></div>
+  <div class="card"><img src="ui/tab_shop.png"><div class="name">Tab·商店</div><div class="file">ui/tab_shop.png</div></div>
+  <div class="card"><img src="ui/tab_pet.png"><div class="name">Tab·宠物</div><div class="file">ui/tab_pet.png</div></div>
+  <div class="card"><img src="ui/tab_decor.png"><div class="name">Tab·装扮</div><div class="file">ui/tab_decor.png</div></div>
+  <div class="card"><img src="ui/tab_friend.png"><div class="name">Tab·好友</div><div class="file">ui/tab_friend.png</div></div>
+  <div class="card"><img src="ui/coin_icon.png"><div class="name">金币</div><div class="file">ui/coin_icon.png</div></div>
+  <div class="card"><img src="ui/level_badge.png"><div class="name">等级徽章</div><div class="file">ui/level_badge.png</div></div>
+  <div class="card"><img src="ui/task_book.png"><div class="name">任务书本</div><div class="file">ui/task_book.png</div></div>
+  <div class="card"><img src="ui/harvest_fab.png"><div class="name">一键收获</div><div class="file">ui/harvest_fab.png</div></div>
+  <div class="card"><img src="ui/share_button.png"><div class="name">分享按钮</div><div class="file">ui/share_button.png</div></div>
+</div>
+
+</body>
+</html>

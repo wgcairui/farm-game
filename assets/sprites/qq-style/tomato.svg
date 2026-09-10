@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" width="110" height="110">
+  <title>番茄·v2</title>
+  <!-- 主体 -->
+  <circle cx="55" cy="62" r="36" fill="#e53935" stroke="#3e2723" stroke-width="3"/>
+  <!-- 浅色弧形高光（QQ 农场风无渐变但有"亮块"）-->
+  <path d="M 30 50 Q 25 70 35 90" fill="none" stroke="#ef5350" stroke-width="3" opacity="0.7"/>
+  <!-- 蒂部 5 叶 -->
+  <g fill="#7cb342" stroke="#3e2723" stroke-width="2.5">
+    <path d="M 30 32 L 55 25 L 35 42 Z"/>
+    <path d="M 55 25 L 80 32 L 75 42 Z"/>
+    <path d="M 55 25 L 55 45 L 45 42 Z"/>
+    <path d="M 55 25 L 55 45 L 65 42 Z"/>
+  </g>
+  <!-- 蒂部小梗 -->
+  <rect x="52" y="18" width="6" height="10" fill="#558b2f" stroke="#3e2723" stroke-width="2"/>
+</svg>

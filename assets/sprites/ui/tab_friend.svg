@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <title>Tab·好友</title>
+  <circle cx="40" cy="40" r="35" fill="#b3e5fc" stroke="#01579b" stroke-width="3"/>
+  <!-- 信封 -->
+  <rect x="18" y="28" width="44" height="30" fill="#fff" stroke="#1565c0" stroke-width="2" rx="2"/>
+  <path d="M 18 28 L 40 45 L 62 28" fill="none" stroke="#1565c0" stroke-width="2"/>
+  <circle cx="58" cy="32" r="6" fill="#e53935"/>
+  <text x="58" y="36" text-anchor="middle" fill="white" font-size="9" font-weight="bold">3</text>
+</svg>

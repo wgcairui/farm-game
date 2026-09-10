@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" width="120" height="100">
+  <title>棕色地块·45° 斜俯·v2</title>
+  <!-- 上层（棕色菱形） -->
+  <polygon points="60,15 110,40 60,65 10,40" fill="#8d6e63" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 右侧面（深棕） -->
+  <polygon points="110,40 60,65 60,75 110,50" fill="#5d4037" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 底面（中棕） -->
+  <polygon points="10,40 60,65 60,75 10,50" fill="#a1887f" stroke="#3e2723" stroke-width="3" stroke-linejoin="round"/>
+  <!-- 泥土纹理横线 -->
+  <g stroke="#3e2723" stroke-width="2" fill="none" opacity="0.6">
+    <path d="M 30 38 Q 50 35 70 38"/>
+    <path d="M 30 48 Q 50 45 70 48"/>
+    <path d="M 40 58 Q 60 55 80 58"/>
+  </g>
+</svg>

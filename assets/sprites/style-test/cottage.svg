@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <title>草屋（手绘风）</title>
+  <defs>
+  <linearGradient id="roofG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#f4d56e"/>
+    <stop offset="100%" stop-color="#a47148"/>
+  </linearGradient>
+
+  <linearGradient id="wallG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#f5e6c8"/>
+    <stop offset="100%" stop-color="#d4b878"/>
+  </linearGradient>
+
+  <linearGradient id="doorG" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#5d4037"/>
+    <stop offset="100%" stop-color="#3e2618"/>
+  </linearGradient>
+
+  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+    <feOffset dx="1" dy="2"/>
+    <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  </defs>
+
+  <!-- 投影 -->
+  <ellipse cx="110" cy="205" rx="80" ry="8" fill="#000" opacity="0.15"/>
+
+  <!-- 烟囱 -->
+  <rect x="140" y="20" width="22" height="45" fill="#5d4037" filter="url(#softShadow)"/>
+  <rect x="135" y="15" width="32" height="10" fill="#3e2618" rx="2"/>
+  <!-- 烟 -->
+  <ellipse cx="151" cy="10" rx="12" ry="7" fill="#ffffff" opacity="0.85"/>
+  <ellipse cx="160" cy="-2" rx="16" ry="8" fill="#ffffff" opacity="0.6"/>
+
+  <!-- 屋顶（茅草层叠加，制造厚度感） -->
+  <polygon points="5,90 215,90 195,30 25,30" fill="url(#roofG)" stroke="#5d4037" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 茅草纹理 -->
+  <g stroke="#a47148" stroke-width="1.5" opacity="0.5" stroke-linecap="round">
+    <path d="M 20 90 Q 25 60 30 30" fill="none"/>
+    <path d="M 45 90 Q 50 60 55 30" fill="none"/>
+    <path d="M 70 90 Q 75 60 80 30" fill="none"/>
+    <path d="M 95 90 Q 100 60 105 30" fill="none"/>
+    <path d="M 120 90 Q 125 60 130 30" fill="none"/>
+    <path d="M 145 90 Q 150 60 155 30" fill="none"/>
+    <path d="M 170 90 Q 175 60 180 30" fill="none"/>
+    <path d="M 195 90 Q 200 60 205 30" fill="none"/>
+  </g>
+
+  <!-- 墙体 -->
+  <rect x="20" y="90" width="180" height="110" fill="url(#wallG)" stroke="#5d4037" stroke-width="2.5" rx="3"/>
+  <!-- 木纹 -->
+  <g opacity="0.25">
+    <line x1="50" y1="95" x2="50" y2="195" stroke="#5d4037" stroke-width="1"/>
+    <line x1="90" y1="95" x2="90" y2="195" stroke="#5d4037" stroke-width="1"/>
+    <line x1="130" y1="95" x2="130" y2="195" stroke="#5d4037" stroke-width="1"/>
+    <line x1="170" y1="95" x2="170" y2="195" stroke="#5d4037" stroke-width="1"/>
+  </g>
+
+  <!-- 左窗 -->
+  <rect x="38" y="115" width="38" height="38" fill="#42a5f5" stroke="#5d4037" stroke-width="2.5" rx="2"/>
+  <line x1="57" y1="115" x2="57" y2="153" stroke="#5d4037" stroke-width="2"/>
+  <line x1="38" y1="134" x2="76" y2="134" stroke="#5d4037" stroke-width="2"/>
+  <!-- 窗高光 -->
+  <rect x="40" y="117" width="15" height="13" fill="#ffffff" opacity="0.4"/>
+
+  <!-- 右窗 -->
+  <rect x="144" y="115" width="38" height="38" fill="#42a5f5" stroke="#5d4037" stroke-width="2.5" rx="2"/>
+  <line x1="163" y1="115" x2="163" y2="153" stroke="#5d4037" stroke-width="2"/>
+  <line x1="144" y1="134" x2="182" y2="134" stroke="#5d4037" stroke-width="2"/>
+  <rect x="146" y="117" width="15" height="13" fill="#ffffff" opacity="0.4"/>
+
+  <!-- 门 -->
+  <rect x="90" y="135" width="40" height="65" fill="url(#doorG)" stroke="#5d4037" stroke-width="2.5" rx="3"/>
+  <circle cx="120" cy="170" r="3" fill="#f0b400"/>
+  <!-- 门缝 -->
+  <line x1="110" y1="138" x2="110" y2="195" stroke="#3e2618" stroke-width="1" opacity="0.5"/>
+</svg>
