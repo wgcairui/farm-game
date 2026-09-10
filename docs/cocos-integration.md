@@ -1,324 +1,170 @@
-# Cocos Creator 集成指南
+# Cocos Creator 集成与实施指南
 
-把设计稿 + SVG 资源落地到 Cocos Creator 工程的标准流程。
+> 更新：2026-09-10。本文是实施要求，不是工程完成报告。
+> **v24 上轮工程检查通过，本轮桌面静态视觉复审未通过。** 相关素材只能作为开发占位，不得直接冻结为最终美术。
+> 问题证据、12 项修正动作及关闭条件见 [视觉修正实施计划](./visual-repair-plan-v24.md)。本轮未重新验收移动端画面或运行 Cocos 工程。
 
-## 一、环境准备
+## 1. 实施顺序与边界
 
-| 工具 | 版本 |
-|------|------|
-| Cocos Dashboard | 最新 |
-| Cocos Creator | 3.8.x LTS |
-| Node.js | ≥ 18 LTS |
-| TypeScript | 内置 |
-| 微信开发者工具 | 最新（小程序发布）|
-| Xcode | 15+（iOS） |
-| Android Studio | Hedgehog+（Android） |
+| 阶段 | 工作 | 进入下一阶段的条件 |
+|---|---|---|
+| A：空间结构 | 修栅栏侵入土地、建筑视角、树林纵深、时间遮屋及灰矩形归属 | V01–V05 经真实画面确认关闭 |
+| B：美术表达 | 修图标语义、托手、地块材质、花石板、重复纹理、引导与底部收尾 | V06–V12 修正并复审 |
+| C：多尺寸复验 | 692/375/390/430px 画面、文字、命中区及普通/引导状态 | 每项有候选版本截图与检查记录 |
+| D：资源冻结 | 逐对象导出 PNG，校验透明边缘，记录清单及版本，打包图集 | 已通过 A–C；资源可追溯 |
+| E：正式接入 | 场景、独立命中层、业务、动画、音效与设备适配 | 编译、功能、视觉和设备测试分别通过 |
 
-## 二、项目初始化
+可并行做工程初始化、灰盒种植流程、存档和临时资源导出；正式布局冻结依赖 A，正式美术冻结依赖 A–C。不要用“网页审计通过”跳过客户端验收，也不要继续按有缺陷的 v24 图层整体烘焙。
 
-### 步骤 1：创建 2D 项目
+原按周数排列的时间表不再作为完成承诺。每个阶段按证据关闭，缺陷待修不等于实施已完成。
 
-1. 打开 Cocos Dashboard → "新建项目"
-2. 选 **2D** 模板（不要选 3D）
-3. 项目名：`FarmGame`
-4. 路径：`/Users/cairui/Code/FarmGame`（**不要**和设计稿同一目录）
-5. 引擎版本：3.8.x LTS
+## 2. 工程准备
 
-### 步骤 2：导入 SVG 资源
+- 使用 Cocos Creator 2D，选定并记录实际使用的 3.8.x 版本；平台工具要求按该版本与发布目标核对。
+- 可将客户端放在独立目录 `/Users/cairui/Code/FarmGame`；先确认目标目录内容，不覆盖已有工程。
+- TypeScript 为内置支持，无需另设“开启 TypeScript”步骤。
+- 本仓库 `scripts/` 还包含 Python 评分工具。只挑选所需 `.ts` 业务文件、保留相对目录；不要使用整个目录的通配复制命令。
+- 现有业务骨架不是已验证的 Cocos 组件。接入前核对构造方式、存档字段、事件订阅和生命周期，完成编译与测试；不以示例代码代替实际接口验证。
 
-把 `assets/sprites/` 整个目录拷到 Cocos 工程的 `assets/` 下：
+建议目录：
 
-```bash
-cp -r /Users/cairui/Code/farm-game/assets/sprites/* \
-      /Users/cairui/Code/FarmGame/assets/
+```text
+FarmGame/assets/
+├── scenes/Main.scene
+├── prefabs/          # Plot、Crop、Building、UIButton
+├── scripts/          # 仅客户端所需 TypeScript
+├── sprites/          # 已校验的 PNG 与图集配置
+├── resources/        # 确需运行时按路径加载的资源
+├── audio/
+└── fonts/
 ```
 
-**在 Cocos 中**：
-1. 选中所有 SVG 文件 → 右键 → "**导入为 Sprite Frame**"
-2. Type 选 `sprite-frame`
-3. Filter Mode 选 `bilinear`
-4. Prem勾 alpha 勾选
-5. 点击"应用" → Cocos 自动转换 SVG 为图集
+SVG 源文件保留在设计仓库，与客户端运行资源分开；旧资源库不能自动视为与 v24 生成器内容一致。
 
-### 步骤 3：开启 TypeScript
+## 3. 资源制作与导入
 
-`项目设置 → Scripting → TypeScript → 启用`
+1. 视觉验收前仅导出明确标记的候选/占位资源；通过后冻结源文件版本。
+2. 使用能正确渲染渐变、滤镜和透明度的工具，从 SVG 源逐对象栅格化为 PNG。SVG 优化工具不是 PNG 渲染器。
+3. 不把完整主页导成单张交互背景；地块、作物、建筑、道具、HUD 与命中节点保持独立。禁止将用户参考截图作为资源底图。
+4. 核验物件外部透明区、抗锯齿边缘、阴影裁切、颜色、尺寸与导出倍率。天空/完整背景无需强制透明；角色与道具不可残留白底。
+5. 在所选 Creator 版本中导入 PNG，并配置可供 Sprite 使用的 SpriteFrame。图集使用该版本支持的自动图集或已验证的外部打包流程；不假设存在“右键 SVG 自动转图集”的操作。
+6. 按实际渲染验证过滤、透明混合和图集边缘；不未经检查统一切换预乘 Alpha。导入后对比源图，防止黑边、色差和裁切。
 
-Cocos Creator 3.8 内置 TS 支持，无需额外配置。
+每项资源至少记录：
 
-## 三、项目结构搭建
+| 字段 | 要求 |
+|---|---|
+| 来源 | 源文件路径、对象/图层 ID；外来资源记录授权 |
+| 尺寸 | 导出像素宽高、逻辑宽高、裁切偏移 |
+| 导出倍率 | 如 1×/2×，不能直接将像素尺寸当逻辑尺寸 |
+| 锚点 | 归一化锚点与原点约定 |
+| 落地点 | 地面接触点 x/y 及坐标方向，用于定位与排序 |
+| 图层 | 父节点、兄弟顺序、允许遮挡对象 |
+| 版本 | 候选/已冻结状态、源版本、文件 hash |
 
-### 推荐目录结构
+清单是待建立的交付要求，不声称已有自动生成工具。候选也应有版本标识，方便对照修正前后。
 
-```
-FarmGame/
-├── assets/
-│   ├── scenes/              # Cocos 场景文件
-│   │   ├── Main.scene       # 农场主页场景
-│   │   ├── Inventory.scene  # 仓库场景
-│   │   └── Shop.scene       # 商店场景
-│   ├── prefabs/             # 预制体
-│   │   ├── Plot.prefab      # 地块 prefab
-│   │   ├── Crop.prefab      # 作物 prefab
-│   │   ├── Building.prefab  # 建筑物 prefab
-│   │   └── UIButton.prefab  # UI 按钮
-│   ├── scripts/             # 业务逻辑
-│   │   ├── core/            # GameApp / EventBus / TimeManager
-│   │   ├── systems/         # FarmSystem / ShopSystem 等
-│   │   ├── ui/              # UI 控制器
-│   │   └── utils/           # 工具
-│   ├── resources/           # 动态加载资源
-│   ├── audio/               # BGM / SFX
-│   └── sprites/             # SVG 资源（已拷贝）
-├── settings/                # 项目配置
-├── profiles/                # 构建配置
-└── package.json
+## 4. 坐标、投影与设备适配
+
+### 4.1 统一逻辑坐标
+
+主页以 `692×1218` 为逻辑画布，沿用 [v24 场景基线](./scene-spec-v24.md) 的地块中心：
+
+```text
+C(i,j) = (393 + 47(i-j), 613 + 24(i+j))
+U=(47,24), V=(-47,24)，4×6 共24格
 ```
 
-### 复制业务脚本
+这是接近 2:1 的实测 dimetric 网格，不是 45° 真等距。保留邻接关系；材质修正不改变格中心。
 
-```bash
-cp -r /Users/cairui/Code/farm-game/scripts/* \
-      /Users/cairui/Code/FarmGame/assets/scripts/
+设计稿以左上角为原点、y 向下。Cocos 节点使用父节点局部坐标，不能笼统宣称 Canvas 原点一定在左下角。对一个宽 W、高 H、锚点为 `(ax,ay)` 的设计容器，若物件定位点对应设计稿 `(x,y)`：
+
+```text
+localX = x - ax * W
+localY = (1 - ay) * H - y
 ```
 
-## 四、prefab 模板搭建
+例如容器采用中心锚点 `(0.5,0.5)`，W=692、H=1218，则 `(100,200)` 转为 `(-246,409)`。物件自身锚点应对齐相同定位点；裁切或落地点变化时同步补偿。父节点存在额外变换时需经过对应坐标转换，不直接套公式。
 
-### 4.1 地块 prefab（Plot.prefab）
+### 4.2 屏幕、安全区与命中区
 
-**节点树**：
-```
-Plot (Node)
-├── Background (Sprite)         ← plot_grass.svg 或 plot_dirt.svg
-├── Crop (Node)                 ← 可切换子节点
-│   ├── Stage1 (Sprite)         ← *_seedling.svg
-│   ├── Stage2 (Sprite)         ← 中间阶段（半透明 overlay）
-│   ├── Stage3 (Sprite)         ← 成熟作物
-│   └── ReadyBadge (Node)       ← 可收获黄色脉冲圆点
-└── ProgressRing (Sprite)       ← 进度环
-```
+- 世界场景等比缩放，不把 750×1334 坐标直接混入本画布或非等比拉伸。
+- 超长屏和短屏的可视区域、留白/背景延展与 HUD 布局分别处理，不依赖整页拉伸。
+- 安全区来自目标平台的安全区域信息；屏幕宽高本身不能推出刘海、系统手势或小游戏胶囊占用区。
+- HUD 视觉与 Button/UITransform 命中节点分离。浏览器以至少 `44×44 CSS px` 验证，原生端按设备逻辑屏幕单位校准，不混淆物理像素、CSS px、pt 与设计单位。
+- 若设计容器的屏幕缩放为 s，命中区设计宽高至少为 `44/s`，并考虑父节点缩放。375px 宽且按 692 等比缩放时约需 81.2 设计单位，而不是 44。
+- 左侧窄屏重排必须同时更新可见图标与命中区；关闭按钮的扩大区域不得越屏。每次修正后重测，不能沿用旧结果。
+- 高 DPI 不解决小字问题。关键 HUD 独立字号、长文本和真实尺寸可读性另行验收。
 
-**绑定组件**：
-- `Plot.ts`（业务脚本）
-- 暴露属性：`@property(Sprite) background` / `@property(Node) crop` / `@property(Sprite) progressRing`
+## 5. 场景节点与遮挡
 
-### 4.2 作物 prefab（Crop.prefab）
+以下是目标职责划分，不是当前工程节点已经存在的声明。常规 2D UI 渲染以节点树遍历和兄弟顺序组织前后关系；不要仅靠任意 `position.z` 数值表达层级。多相机、材质与渲染设置变化时重新核验。
 
-3 个 Sprite 子节点，对应 `seedling` / `growing` / `mature` 阶段，运行时切换可见性。
-
-### 4.3 建筑物 prefab（Building.prefab）
-
-直接放 SVG + 一个 `House` 节点引用即可。示例代码：
-
-```typescript
-// scripts/systems/FarmSystem.ts（已提供）
-const PLOT = 'Plot';  // prefab 路径
-resources.load(PLOT, Prefab, (err, prefab) => {
-  const node = instantiate(prefab);
-  this.node.addChild(node);
-});
-```
-
-## 五、场景搭建（Main.scene）
-
-### 节点树
-
-```
-Canvas (Node, 750×1334)
-├── Camera
-├── Background (Node, z=-1)
-│   ├── Sky (Sprite, sky_gradient.svg)
-│   ├── Clouds (Node)
-│   │   ├── CloudA (cloud_a.svg)
-│   │   ├── CloudB (cloud_b.svg)
-│   ├── Mountains (Sprite, mountains_far.svg)
-│   ├── Trees (Node)
-│   │   ├── TreeL (tree_large.svg)
-│   │   ├── TreeR (tree_conifer.svg)
-│   ├── Grass (Sprite, grass_tile.svg)
-│   ├── Pond (Sprite, pond.svg)
-│   ├── Cottage (Sprite, buildings/cottage.svg)
-│   └── Path (Node)
-│       ├── StonePath1 (stone_path.svg)
-│       └── StonePath2 (stone_path.svg)
-├── FarmLayer (Node, z=0)
-│   ├── PlotGrid (Node)
-│   │   ├── Plot00 (Plot.prefab)
-│   │   ├── Plot01 (Plot.prefab)
-│   │   └── ... (24 个)
-├── HUD (Node, z=10)
-│   ├── TopBar (HUD.ts)
-│   │   ├── Avatar (Sprite, avatar_lion.svg)
-│   │   ├── LevelBadge (Label)
-│   │   ├── ExpBar (ProgressBar)
-│   │   ├── CoinBox (Sprite + Label)
-│   │   └── GemBox
-│   ├── SideLeft (Node)
-│   │   ├── ShareBtn
-│   │   ├── MusicBtn
-│   │   └── MenuBtn
-│   ├── SideRight (Node)
-│   │   ├── MallBtn
-│   │   ├── CharityBtn
-│   │   └── OneKeyFarmBtn
-│   ├── TaskBar (Node)
-│   │   ├── Icon (book)
-│   │   ├── Progress
-│   │   └── Finger (emoji)
-│   └── FriendHelp (Node)
-│       ├── Avatar
-│       ├── Info
-│       └── CloseBtn
-└── TabBar (Node, z=11)
-    ├── TabInventory (tab_inventory.svg)
-    ├── TabShop (tab_shop.svg)
-    ├── TabPet (tab_pet.svg)
-    ├── TabDecor (tab_decor.svg)
-    └── TabFriend (tab_friend.svg)
+```text
+Canvas
+├── WorldRoot
+│   ├── SkyAndClouds
+│   ├── Mountains
+│   ├── Ground
+│   ├── Forest
+│   ├── PondAndRearProps
+│   ├── Path
+│   ├── PlotGrid                 # 24个Plot，独立作物
+│   ├── SceneProps               # 建筑、标牌等；按落地点复核顺序
+│   └── ForegroundDecor          # 外围栅栏、装饰，不横跨土地顶面
+└── HUDRoot                      # 单独处理安全区
+    ├── TopBar
+    ├── SideLeft
+    ├── SideRight                # 商城、公益、时间；篮/灰物件先明确归属
+    ├── OneKeyFarmBtn            # 中下方独立按钮，不隶属于右列布局
+    ├── TaskBar
+    ├── FriendHelp
+    ├── TabBar
+    └── GuideGlove               # 普通状态隐藏，引导时指向具体目标
 ```
 
-### 屏幕适配
+- 草地先于树林，但树墙、景深、建筑透视仍需美术修正；正确顺序不能替代正确体块。
+- 场景道具以地面落点与实际遮挡决定顺序。若两个对象需要交错前后关系，拆分前后部分，不用单一大图强压。
+- 对需按设计 y 排序的同层对象，通常较大 y 代表较靠前；转换成引擎坐标后方向相反，不能照搬升降序。用实际遮挡测试确认。
+- 栅栏不得跨可种植顶面，时间不得切断主要建筑轮廓，即使旧审计白名单允许也不放行。
+- 灰矩形若为烟囱必须连接建筑；若无语义则移除。篮子的场景道具/快捷入口身份在视觉修正阶段明确，不创建两套重复视觉。
+- 手套只有一个来源，不在 TaskBar 中再放一个常驻副本；引导状态控制显示及目标，不应拦截无关操作。
 
-`项目设置 → 项目数据 → 设计分辨率 / 适配屏幕宽度`
+## 6. Prefab 与业务接入
 
-```
-设计分辨率：750 × 1334（iPhone 14）
-适配策略：Fixed Width
-```
+- **Plot**：独立土地 Sprite、作物容器、必要的进度/可收获状态；位置由网格计算。点击区域按土地交互设计验证，不把 13 个 HUD 按钮检查当作地块点击已实现。
+- **Crop**：按实际作物配置提供生长状态素材与切换逻辑；资源数量与业务阶段核对，不将临时半透明覆盖当正式生长美术。
+- **Building**：重画后的斜俯视建筑 Sprite 与落地点信息，必要时拆分阴影/前景部分。
+- **UIButton**：可见 Sprite/Label 与独立命中节点，具备正常、按下、禁用和焦点等所需状态。
+- **业务**：先核对现有 TypeScript 接口，再逐步接入存档、计时、种植、收获、仓库、商店及 HUD；验证事件解绑、异常路径和重载恢复。
 
-## 六、关键脚本接入
+## 7. 客户端验收清单
 
-### GameApp 启动顺序
+### 资源和视觉
 
-```typescript
-// scripts/core/GameApp.ts
-import { _decorator, Component } from 'cc';
-import { SaveManager } from './SaveManager';
-import { EconomySystem } from '../systems/EconomySystem';
-import { InventorySystem } from '../systems/InventorySystem';
-import { FarmSystem } from '../systems/FarmSystem';
-import { ShopSystem } from '../systems/ShopSystem';
-import { TimeManager } from './TimeManager';
+- [ ] V01–V12 均有关闭证据，正式资源版本与截图一致。
+- [ ] 不存在整页截图底图、白底边缘、阴影裁切或旧占位混入。
+- [ ] 地块连续；建筑视角统一；栅栏不跨土地；时间不遮建筑；树林有纵深。
+- [ ] 692/375/390/430px 分别检查全图、文字、命中区、安全区及普通/引导状态。
+- [ ] 命中区屏幕等效尺寸达标、无重叠或越界；扩大命中不妨碍相邻控件。
+- [ ] 图标遮住文字后仍能表达功能，底部不显示 ID/version。
 
-@ccclass('GameApp')
-export class GameApp extends Component {
-  public timeManager = new TimeManager();
-  public saveManager = new SaveManager();
-  public economy = new EconomySystem();
-  public inventory = new InventorySystem();
-  public farm = new FarmSystem();
-  public shop = new ShopSystem();
+### 功能与工程
 
-  onLoad() {
-    this.saveManager.load();
-    this.economy.init(this.saveManager.data.coins, this.saveManager.data.diamonds);
-    this.inventory.init(this.saveManager.data.inventory);
-    this.farm.setTimeManager(this.timeManager);
-    this.farm.bindInventory(this.inventory);
-    this.farm.init(this.saveManager.data.plots);
-    this.shop.bind(this.economy, this.inventory);
+- [ ] 所选 Creator 版本下 TypeScript 编译通过，启动无未处理错误。
+- [ ] 种植、成长、收获、出售与库存/货币一致。
+- [ ] 存档和离线成长按业务配置正确恢复。
+- [ ] 导航、关闭、任务和引导行为逐项验证，不只验证按钮存在。
+- [ ] 微信小游戏及后续原生端分别构建与设备测试，不能用网页通过替代。
 
-    this.farm.recalcOnLogin();
-    this.schedule(this.farm.tick.bind(this.farm), 1.0);
-  }
-}
-```
+性能目标沿用首包 ≤4 MB、启动 ≤2s、30 个作物动画 ≥30 FPS、内存 ≤200 MB，均为待测目标，不是已达成结果。记录设备、平台版本、构建模式和测量方式；发布限制以实际平台当前规则为准。纹理压缩、图集、对象池、分包和懒加载在测量后选择并复测。
 
-挂载到 `Canvas` 下的一个常驻 Node（如 `_App`）即可。
+## 8. 相关文档
 
-## 七、构建发布
+- [视觉修正实施计划](./visual-repair-plan-v24.md)：任务、依赖与完成定义。
+- [主页场景基线 v24](./scene-spec-v24.md)：现状坐标、生成器、历史检查边界。
+- [通用设计规范](./design-spec.md)：弹层组件与 token。
+- [数据结构](./data-schema.md)、[业务骨架](../scripts/)：接入前核对实际接口。
+- [Cocos Creator 官方手册](https://docs.cocos.com/creator3.8/manual/zh/)：按实际选定版本核对导入、构建与平台设置。
 
-### 7.1 微信小游戏
-
-1. `项目设置 → 微信小游戏 → AppID`（测试可填"测试号"）
-2. `构建 → 微信小游戏` → 输出到 `build/wechatgame/`
-3. 微信开发者工具导入 `build/wechatgame/` 即可预览
-4. 提交审核前需要在 `project.config.json` 填入小游戏 AppID
-
-### 7.2 iOS
-
-1. `项目设置 → iOS` 配证书
-2. `构建 → iOS` → 输出 Xcode 工程
-3. Xcode 打开 → Archive → 上传 App Store Connect
-
-### 7.3 Android
-
-1. `项目设置 → Android` 配 keystore
-2. `构建 → Android` → 输出 APK / AAB
-3. 上传 Google Play 或国内安卓市场
-
-## 八、性能预算与优化
-
-| 指标 | 目标 |
-|------|------|
-| 首包大小（微信）| ≤ 4 MB |
-| 启动时间 | ≤ 2s |
-| 30 个作物动画同播 | ≥ 30 FPS |
-| 内存占用 | ≤ 200 MB |
-
-**优化策略**：
-
-| 优化项 | 做法 |
-|--------|------|
-| 纹理压缩 | ASTC（iOS）/ ETC2（Android）|
-| 图集打包 | TexturePacker 把同场景 sprite 打图集 |
-| 对象池 | 作物动画预创建，复用 |
-| 分包加载 | 首包只含农场场景，其他场景分包 |
-| 资源懒加载 | 商店/仓库按需 load |
-
-## 九、调试与开发流程
-
-### 9.1 调试工具
-
-- **Cocos 编辑器**：场景搭建、prefab 编辑、属性面板
-- **VSCode**：TS 编辑（推荐装 Cocos 插件）
-- **Chrome DevTools**：调试 H5 / 小游戏模式
-- **Safari Web Inspector**：调试 iOS WKWebView
-- **微信开发者工具**：调试小游戏
-
-### 9.2 开发命令
-
-```bash
-# 启动 Cocos Dashboard 后，从 Dashboard 打开项目即可
-# 命令行构建（CI 用）：
-cd /Users/cairui/Code/FarmGame
-CocosCreator --path . --build "platform=wechatgame"
-```
-
-### 9.3 调试 checklist
-
-- [ ] 首次启动能看到农场主页场景
-- [ ] 地块能点击 → 弹出种子选择器
-- [ ] 种下后能看到作物生长动画
-- [ ] 收获后金币增加
-- [ ] 关闭游戏 1 小时后重开，作物自动成熟
-- [ ] 仓库/商店页 Tab 切换流畅
-- [ ] 微信开发者工具能跑（4 MB 首包）
-
-## 十、版本里程碑
-
-| 阶段 | 产物 | 周数 |
-|------|------|------|
-| **Week 1-2** | 工程初始化 + 资源导入 + 主场景搭建 | 2 |
-| **Week 3-4** | GameApp + FarmSystem + ShopSystem 业务接入 | 2 |
-| **Week 5-6** | UI 控制器 + 动画 + 音效 | 2 |
-| **Week 7-8** | 调优 + 性能优化 + 微信小游戏发布 | 2 |
-| **Week 9-12**| iOS / Android 移植 | 4 |
-
-## 十一、参考资源
-
-- Cocos 官方文档：https://docs.cocos.com/creator3.8/manual/zh/
-- TypeScript 手册：https://www.typescriptlang.org/docs/handbook/
-- 设计规范：本目录 `docs/design-spec.md`
-- 数据结构：本目录 `docs/data-schema.md`
-- 业务骨架：本目录 `scripts/`
-
----
-
-**任何问题先看：**
-1. `docs/data-schema.md` — 字段定义
-2. `docs/design-spec.md` — 视觉规范
-3. `scripts/systems/` — 业务逻辑参考实现
-4. `assets/sprites/README.md` — 资源说明
-
-如果还卡，请把控制台报错 + 截图发出来一起排查。
+本次修改仅涉及文档；没有创建客户端工程、转换素材或实施视觉修正。
