@@ -18,7 +18,7 @@ test('ApiClient sends x-protocol-version and x-platform headers', async () => {
   assert.equal(captured!.url, 'http://example.test/crop/configs');
   const headers = captured!.init?.headers as Record<string, string>;
   assert.equal(headers['x-platform'], 'ios');
-  assert.match(headers['x-protocol-version'], /^1\./);
+  assert.match(headers['x-protocol-version'], /^2\./);
 });
 
 test('ApiClient.loginWeChat posts JSON body and returns parsed shape', async () => {

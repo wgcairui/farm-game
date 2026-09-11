@@ -11,9 +11,12 @@ import {
   Platform,
   type ApiResponse,
   type CropConfig,
+  type FarmHarvestResponse,
+  type FarmPlantResponse,
+  type FarmUnlockResponse,
+  type FarmWaterResponse,
   type LoginResponse,
   type PlayerSave,
-  type PlotState,
   type WeChatLoginRequest,
   type OAuthLoginRequest,
 } from '@farm-game/shared';
@@ -82,10 +85,47 @@ export class ApiClient {
     return res.json() as Promise<ApiResponse<{ crops: CropConfig[]; version: number }>>;
   }
 
-  async unlockPlot(plotIndex: number): Promise<ApiResponse<{ plot: PlotState }>> {
+  async unlockPlot(plotIndex: number, operationId: string = makeOperationId()): Promise<ApiResponse<FarmUnlockResponse>> {
     const res = await this._fetch(`${this.baseUrl}/farm/unlock`, {
-      method: 'POST', headers: this._headers(), body: JSON.stringify({ plotIndex }),
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ operationId, body: { plotIndex } }),
     });
-    return res.json() as Promise<ApiResponse<{ plot: PlotState }>>;
+    return res.json() as Promise<ApiResponse<FarmUnlockResponse>>;
   }
+
+  async plantPlot(plotIndex: number, cropId: string, operationId: string = makeOperationId()): Promise<ApiResponse<FarmPlantResponse>> {
+    const res = await this._fetch(`${this.baseUrl}/farm/plant`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ operationId, body: { plotIndex, cropId } }),
+    });
+    return res.json() as Promise<ApiResponse<FarmPlantResponse>>;
+  }
+
+  async waterPlot(plotIndex: number, operationId: string = makeOperationId()): Promise<ApiResponse<FarmWaterResponse>> {
+    const res = await this._fetch(`${this.baseUrl}/farm/water`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ operationId, body: { plotIndex } }),
+    });
+    return res.json() as Promise<ApiResponse<FarmWaterResponse>>;
+  }
+
+  async harvestPlot(plotIndex: number, operationId: string = makeOperationId()): Promise<ApiResponse<FarmHarvestResponse>> {
+    const res = await this._fetch(`${this.baseUrl}/farm/harvest`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ operationId, body: { plotIndex } }),
+    });
+    return res.json() as Promise<ApiResponse<FarmHarvestResponse>>;
+  }
+}
+
+/** Browser/node UUIDv4 with a defensive fallback for older runtimes. */
+export function makeOperationId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `op-${Date.now().toString(36)}-${rand}`;
 }

@@ -8,10 +8,9 @@
  * replay-based cheating where a client could pretend it watered more times
  * than the persisted `waterCount` reflects.
  *
- * G0 review fix (H4): failure reasons are split so the client UI can show
- * "already ripe" vs "plot locked" distinctly, and corrupted `matureAt`
- * values (NaN/Infinity from a bad save) are rejected with `corrupted` rather
- * than silently producing `NaN`.
+ * Per ADR-0002 D10/D11: status enum is now `locked / empty / growing / ripe`.
+ * The `withered` state is removed (D11); ripe plots are reachable through
+ * `status: 'ripe'` once `now >= matureAt`.
  */
 
 import { getCrop } from '../types/crop.js';
@@ -38,11 +37,11 @@ export function computeMatureAt(plantedAt: number, cropId: string): number | und
 
 export type ApplyWaterFailure =
   | 'unknown_crop'
-  | 'not_growing'        // status is 'empty' (no crop planted)
-  | 'already_ripe'       // status is 'ready' (matureAt <= now)
-  | 'withered'           // status is 'withered'
+  | 'plot_locked'         // status is 'locked' (not yet purchased)
+  | 'not_growing'         // status is 'empty' (no crop planted)
+  | 'already_ripe'        // status is 'ripe' (matureAt <= now)
   | 'limit_reached'
-  | 'corrupted';         // matureAt missing or non-finite
+  | 'corrupted';          // matureAt missing or non-finite
 
 export interface ApplyWaterResult {
   matureAt: number;
@@ -53,12 +52,12 @@ export interface ApplyWaterResult {
  * Apply one watering to a growing plot.
  *
  * Returns `null` plus a `reason` on failure:
+ *  - `plot_locked`  — status is 'locked' (unlock the tile first)
+ *  - `not_growing`  — status is 'empty' (no crop planted)
  *  - `unknown_crop` — `cropId` not in `CROPS`
- *  - `not_growing` — status is 'empty' (no crop planted)
- *  - `already_ripe` — status is 'ready' (matureAt reached)
- *  - `withered` — status is 'withered'
- *  - `limit_reached` — `waterCount >= crop.maxWater`
- *  - `corrupted` — `matureAt` is missing or non-finite (refuse rather than
+ *  - `already_ripe` — status is 'ripe' (matureAt reached)
+ *  - `limit_reached`— `waterCount >= crop.maxWater`
+ *  - `corrupted`    — `matureAt` is missing or non-finite (refuse rather than
  *    propagate NaN into the next state)
  *
  * On success, `newMatureAt = now + ceil((oldMatureAt - now) × 0.95)`. Each water
@@ -69,9 +68,9 @@ export function applyWater(
   plot: PlotState,
   now: number,
 ): { ok: true; value: ApplyWaterResult } | { ok: false; reason: ApplyWaterFailure } {
+  if (plot.status === 'locked') return { ok: false, reason: 'plot_locked' };
   if (plot.status === 'empty') return { ok: false, reason: 'not_growing' };
-  if (plot.status === 'ready') return { ok: false, reason: 'already_ripe' };
-  if (plot.status === 'withered') return { ok: false, reason: 'withered' };
+  if (plot.status === 'ripe') return { ok: false, reason: 'already_ripe' };
   // plot.status === 'growing' from here.
   if (!plot.cropId) return { ok: false, reason: 'not_growing' };
   const cfg = getCrop(plot.cropId);
@@ -82,7 +81,7 @@ export function applyWater(
   if (plot.waterCount >= cfg.maxWater) return { ok: false, reason: 'limit_reached' };
 
   const remaining = plot.matureAt - now;
-  // remaining can be 0 if `now === matureAt` exactly (status should be 'ready'
+  // remaining can be 0 if `now === matureAt` exactly (status should be 'ripe'
   // by then, but defend against clock skew).
   if (remaining <= 0) return { ok: false, reason: 'already_ripe' };
 

@@ -115,10 +115,10 @@ test('applyWater rejects not_growing for empty plots', () => {
   assert.equal(r.reason, 'not_growing');
 });
 
-test('applyWater rejects already_ripe for ready plots (distinct from not_growing)', () => {
+test('applyWater rejects already_ripe for ripe plots (distinct from not_growing)', () => {
   const now = Date.now();
   const plot = {
-    id: 'p:0', index: 0, unlocked: true, status: 'ready' as const,
+    id: 'p:0', index: 0, unlocked: true, status: 'ripe' as const,
     cropId: 'carrot', plantedAt: now - 30_000, matureAt: now - 100, waterCount: 0,
   };
   const r = applyWater(plot, now);
@@ -127,16 +127,16 @@ test('applyWater rejects already_ripe for ready plots (distinct from not_growing
   assert.equal(r.reason, 'already_ripe');
 });
 
-test('applyWater rejects withered plots (distinct from already_ripe)', () => {
+test('applyWater rejects locked plots (must unlock first)', () => {
   const now = Date.now();
   const plot = {
-    id: 'p:0', index: 0, unlocked: true, status: 'withered' as const,
-    cropId: 'carrot', plantedAt: now - 60_000, matureAt: now - 30_000, waterCount: 0,
+    id: 'p:0', index: 0, unlocked: false, status: 'locked' as const,
+    waterCount: 0,
   };
   const r = applyWater(plot, now);
   assert.equal(r.ok, false);
   if (r.ok) return;
-  assert.equal(r.reason, 'withered');
+  assert.equal(r.reason, 'plot_locked');
 });
 
 test('applyWater rejects corrupted matureAt (NaN/Infinity/missing)', () => {

@@ -59,4 +59,16 @@ export interface LoginResponse {
   token: string;
   player: import('../types/player.js').PlayerSave;
   auth: AuthContext;
+  /**
+   * Authoritative server epoch ms at the moment the token was issued.
+   * Per ADR-0003 D20: clients use this to seed their local clock skew.
+   */
+  serverNow: number;
+  /**
+   * Server-side state revision at the moment of login. Always >= 0.
+   * Per ADR-0003 D18: the login command itself does NOT bump `revision`
+   * (it is a read of identity), so this is the current revision of the
+   * returned `player` snapshot.
+   */
+  revision: number;
 }

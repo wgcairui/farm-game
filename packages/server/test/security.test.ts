@@ -64,7 +64,7 @@ test('Protocol major mismatch → 426 + PROTOCOL_VERSION_MISMATCH', async () => 
 
 test('Protocol same major → passes through to handler', async () => {
   const res = await fetch(`${baseUrl}/crop/configs`, {
-    headers: { 'x-protocol-version': '1.0.0' },
+    headers: { 'x-protocol-version': '2.0.0' },
   });
   assert.equal(res.status, 200);
 });

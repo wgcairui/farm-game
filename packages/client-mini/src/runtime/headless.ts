@@ -6,6 +6,8 @@
  * Once Cocos Creator 3.8 project lands (Phase 4), the same wiring lives in
  * packages/client-mini/src/cocos/GameApp.ts and is bound to a scene; this
  * file stays as the test scaffold.
+ *
+ * Per ADR-0002 D12: planting deducts gold, harvest awards gold; no inventory.
  */
 
 import {
@@ -19,7 +21,6 @@ import {
   GameEvent,
 } from '@farm-game/shared';
 import { EconomySystem } from '../cocos/systems/EconomySystem.js';
-import { InventorySystem } from '../cocos/systems/InventorySystem.js';
 import { FarmSystem } from '../cocos/systems/FarmSystem.js';
 import { ShopSystem } from '../cocos/systems/ShopSystem.js';
 
@@ -33,14 +34,12 @@ export interface HeadlessConfig {
 export class HeadlessGameApp {
   readonly timeManager = new TimeManager();
   readonly economy = new EconomySystem();
-  readonly inventory = new InventorySystem();
   readonly farm = new FarmSystem();
   readonly shop = new ShopSystem();
 
   private _storage: KeyValueStorage;
   private _save: PlayerSave;
   private _ticker: ReturnType<typeof setInterval> | null = null;
-  private _flusher: ReturnType<typeof setInterval> | null = null;
 
   constructor(cfg: HeadlessConfig = {}) {
     this._storage = cfg.storage ?? new MemoryStorageAdapter();
@@ -50,24 +49,20 @@ export class HeadlessGameApp {
   /** Mirrors GameApp.onLoad() wiring. */
   start(): void {
     this.economy.init(this._save.gold, this._save.gems);
-    this.inventory.init(this._save.inventory);
     this.farm.setTimeManager(this.timeManager);
-    this.farm.bindInventory(this.inventory);
+    this.farm.bindEconomy(this.economy);
     this.farm.init(this._save.plots);
-    this.shop.bind(this.economy, this.inventory);
+    this.shop.init();
 
     this.farm.recalcOnLogin();
     this._ticker = setInterval(() => this.farm.tick(), 1000);
-    this._flusher = setInterval(() => this.flush(), 5000);
     EventBus.emit(GameEvent.AuthLoggedIn, { playerId: this._save.playerId });
   }
 
   /** Mirrors GameApp.onDestroy(). */
   stop(): void {
     if (this._ticker) clearInterval(this._ticker);
-    if (this._flusher) clearInterval(this._flusher);
     this._ticker = null;
-    this._flusher = null;
     this.flush();
   }
 
@@ -75,10 +70,9 @@ export class HeadlessGameApp {
   flush(): void {
     this._save.gold = this.economy.coins;
     this._save.gems = this.economy.diamonds;
-    this._save.inventory = [...this.inventory.items];
     this._save.plots = [...this.farm.plots];
     this._save.updatedAt = Date.now();
-    void this._storage.setItem('farm_game_save_v1', JSON.stringify(this._save));
+    void this._storage.setItem('farm_game_save_v2', JSON.stringify(this._save));
   }
 
   get save(): Readonly<PlayerSave> { return this._save; }

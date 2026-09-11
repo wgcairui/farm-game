@@ -1,56 +1,22 @@
 /**
- * Inventory system (client-mini).
+ * Inventory system — RETIRED placeholder.
+ *
+ * Per ADR-0002 D12: the Phase 1 seed/warehouse detour is gone. Planting
+ * deducts gold directly; harvest awards gold directly. This module is kept
+ * as a typed stub so any older import path compiles, but the runtime is a
+ * no-op and no GameEvent is emitted.
+ *
+ * Callers that still need a transient bag (UI scratch buffers, hot-bar
+ * counts) should be migrated to a typed local map in the new G1 era.
  */
 
-import { EventBus, GameEvent, type InventoryItem } from '@farm-game/shared';
-
-const WAREHOUSE_CAPACITY = 50;
-
 export class InventorySystem {
-  private _items: InventoryItem[] = [];
-
-  init(items: InventoryItem[] | undefined): void {
-    this._items = items ?? [];
-  }
-
-  get items(): ReadonlyArray<InventoryItem> { return this._items; }
-
-  getCount(itemId: string): number {
-    const it = this._items.find((i) => i.itemId === itemId);
-    return it?.count ?? 0;
-  }
-
-  /** Returns false when the warehouse would overflow. */
-  add(itemId: string, count = 1): boolean {
-    if (this.totalCount() + count > WAREHOUSE_CAPACITY) return false;
-    const it = this._items.find((i) => i.itemId === itemId);
-    if (it) it.count += count;
-    else this._items.push({ itemId, count });
-    EventBus.emit(GameEvent.InventoryChanged);
-    return true;
-  }
-
-  remove(itemId: string, count = 1): boolean {
-    const it = this._items.find((i) => i.itemId === itemId);
-    if (!it || it.count < count) return false;
-    it.count -= count;
-    if (it.count <= 0) this._items = this._items.filter((i) => i.itemId !== itemId);
-    EventBus.emit(GameEvent.InventoryChanged);
-    return true;
-  }
-
-  totalCount(): number {
-    return this._items.reduce((sum, i) => sum + i.count, 0);
-  }
-
-  capacity(): number { return WAREHOUSE_CAPACITY; }
-
-  clearByType(itemId: string): number {
-    const it = this._items.find((i) => i.itemId === itemId);
-    if (!it) return 0;
-    const removed = it.count;
-    this._items = this._items.filter((i) => i.itemId !== itemId);
-    EventBus.emit(GameEvent.InventoryChanged);
-    return removed;
-  }
+  init(_items?: unknown): void { /* retired */ }
+  get items(): readonly unknown[] { return []; }
+  getCount(_itemId: string): number { return 0; }
+  add(_itemId: string, _count = 1): boolean { return false; }
+  remove(_itemId: string, _count = 1): boolean { return false; }
+  totalCount(): number { return 0; }
+  capacity(): number { return 0; }
+  clearByType(_itemId: string): number { return 0; }
 }

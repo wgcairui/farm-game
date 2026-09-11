@@ -4,9 +4,9 @@ import { PROTOCOL_VERSION, PROTOCOL_VERSION_MAJOR } from '../src/protocol/versio
 import { ErrorCode, isErrorPayload } from '../src/protocol/error.js';
 import { createDefaultPlayerSave } from '../src/types/player.js';
 
-test('PROTOCOL_VERSION is 1.x', () => {
-  assert.match(PROTOCOL_VERSION, /^1\./);
-  assert.equal(PROTOCOL_VERSION_MAJOR, 1);
+test('PROTOCOL_VERSION is 2.x (per ADR-0002 D13)', () => {
+  assert.match(PROTOCOL_VERSION, /^2\./);
+  assert.equal(PROTOCOL_VERSION_MAJOR, 2);
 });
 
 test('ErrorCode ranges are exclusive (1000-4999) and distinct', () => {
@@ -26,13 +26,15 @@ test('isErrorPayload narrows shape', () => {
   assert.equal(isErrorPayload(undefined), false);
 });
 
-test('createDefaultPlayerSave generates 24 plots with 8 unlocked', () => {
+test('createDefaultPlayerSave generates 24 plots with 6 unlocked (ADR-0002 D9)', () => {
   const save = createDefaultPlayerSave({ playerId: 'tester' });
   assert.equal(save.playerId, 'tester');
   assert.equal(save.plots.length, 24);
-  assert.equal(save.plots.filter((p) => p.unlocked).length, 8);
+  assert.equal(save.plots.filter((p) => p.unlocked).length, 6);
+  assert.equal(save.plots.filter((p) => p.status === 'empty').length, 6);
+  assert.equal(save.plots.filter((p) => p.status === 'locked').length, 18);
   assert.equal(save.gold, 200);
-  assert.equal(save.version, 1);
+  assert.equal(save.version, 2);
   assert.deepEqual(save.identities, []);
 });
 

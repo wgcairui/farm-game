@@ -26,7 +26,6 @@ export class GameStore {
   constructor() {
     this._bind(GameEvent.CoinsChanged);
     this._bind(GameEvent.DiamondsChanged);
-    this._bind(GameEvent.InventoryChanged);
     this._bind(GameEvent.PlotStateChanged);
   }
 
