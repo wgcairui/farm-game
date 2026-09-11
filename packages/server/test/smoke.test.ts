@@ -78,15 +78,24 @@ test('POST /auth/wechat → /player/info → /farm/unlock chain', async () => {
   assert.equal(meBody.data.gold, 200);
   assert.equal(meBody.data.plots.length, 24);
 
+  // /farm/unlock now requires operationId envelope; requires DB mode (G1)
+  // so this assertion runs only when the in-memory dev backend is in use:
+  // in DB-less smoke we send the envelope and accept either 200 (DB) or 503 (in-memory).
   const unlock = await fetch(`${baseUrl}/farm/unlock`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    body: JSON.stringify({ plotIndex: 8 }),
+    body: JSON.stringify({ operationId: 'mock-op-unlock-1', body: { plotIndex: 8 } }),
   });
-  assert.equal(unlock.status, 200);
-  const unlockBody = (await unlock.json()) as { ok: boolean; data: { plot: { unlocked: boolean } } };
-  assert.equal(unlockBody.ok, true);
-  assert.equal(unlockBody.data.plot.unlocked, true);
+  if (unlock.status === 200) {
+    const unlockBody = (await unlock.json()) as { ok: boolean; data: { plot: { unlocked: boolean }; revision: number; serverNow: number } };
+    assert.equal(unlockBody.ok, true);
+    assert.equal(unlockBody.data.plot.unlocked, true);
+    assert.ok(typeof unlockBody.data.revision === 'number');
+    assert.ok(typeof unlockBody.data.serverNow === 'number');
+  } else {
+    // In-memory smoke path (no MAIN_DB_URL) — command not implemented.
+    assert.equal(unlock.status, 503);
+  }
 });
 
 test('GET /crop/configs returns 5 crops', async () => {

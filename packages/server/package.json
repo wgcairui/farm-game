@@ -12,25 +12,37 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --test --import tsx test/*.test.ts",
+    "test:integration": "MAIN_DB_URL=${MAIN_DB_URL:-postgres://farm:farm@127.0.0.1:5432/farm_game_test} node --test --import tsx test/integration/*.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "db:up": "docker compose -f compose.yml up -d postgres",
+    "db:down": "docker compose -f compose.yml down",
+    "db:reset": "docker compose -f compose.yml down -v && docker compose -f compose.yml up -d postgres",
+    "db:migrate": "node --import tsx src/db/migrate.ts up",
+    "db:migrate:test": "TEST_DB_URL=postgres://farm:farm@127.0.0.1:5432/farm_game_test MAIN_DB_URL=$TEST_DB_URL node --import tsx src/db/migrate.ts up",
+    "db:lint": "docker compose -f compose.yml config -q",
+    "demo:loop": "node --import tsx scripts/demo-loop.ts",
+    "smoke": "node --import tsx scripts/smoke-protocol.ts"
   },
   "dependencies": {
     "@colyseus/core": "0.18.3",
     "@colyseus/database": "0.18.3",
     "@colyseus/auth": "0.18.2",
     "@colyseus/admin": "0.18.5",
+    "@farm-game/client-app": "workspace:*",
     "@farm-game/shared": "workspace:*",
     "@mikro-orm/core": "^6.2.0",
     "@mikro-orm/postgresql": "^6.2.0",
     "@mikro-orm/migrations": "^6.2.0",
     "@fastify/jwt": "^10.2.2",
     "fastify": "^5.12.3",
+    "pg": "^8.11.0",
     "pino": "^10.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
+    "@types/pg": "^8.11.0",
     "typescript": "^5.5.4",
     "tsx": "^4.19.2"
   }

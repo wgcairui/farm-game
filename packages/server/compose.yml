@@ -1,0 +1,41 @@
+# PostgreSQL for local dev and integration tests.
+#
+# Per ADR-0003 D30: G1 integration tests must run against a real PostgreSQL,
+# never against an in-memory stub. This compose file is the single source of
+# truth for the dev/test database — never share it with production data.
+#
+# Usage:
+#   pnpm --filter @farm-game/server db:up       # start postgres on 127.0.0.1:5432
+#   pnpm --filter @farm-game/server db:down     # stop and remove the container
+#   pnpm --filter @farm-game/server db:reset    # drop+create the volume
+#   pnpm --filter @farm-game/server db:migrate  # apply MikroORM migrations
+#
+# No Redis is started here on purpose — G2 introduces Redis, not G1.
+
+name: farm-game-server
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: farm-game-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-farm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-farm}
+      POSTGRES_DB: ${POSTGRES_DB:-farm_game}
+    ports:
+      # Bind to loopback only — never expose to the LAN.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - farm-pg-data:/var/lib/postgresql/data
+      # Bootstrap script: create the integration test database on first run.
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farm} -d ${POSTGRES_DB:-farm_game}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  farm-pg-data:
+    name: farm-pg-data

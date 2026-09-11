@@ -92,6 +92,14 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
         'JWT_SECRET_ADMIN must differ from JWT_SECRET in production (admin uses an isolated secret).',
       );
     }
+    // Per ADR-0003 D30: production requires an explicit, non-default MAIN_DB_URL.
+    // The dev default URL points at the local docker container; if it leaks
+    // into production via env inheritance, the boot fails closed.
+    if (process.env.MAIN_DB_URL === undefined || process.env.MAIN_DB_URL === '') {
+      throw new ConfigError(
+        'MAIN_DB_URL must be set explicitly in production (ADR-0003 D30). Refusing to start.',
+      );
+    }
   }
 
   // Dev/test permit defaults but warn on suspicious host binding.

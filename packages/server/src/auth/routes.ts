@@ -19,6 +19,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   AuthProvider,
+  createDefaultPlayerSave,
   ErrorCode,
   PROTOCOL_VERSION,
   toIdentitySummary,
@@ -28,20 +29,45 @@ import {
   type AuthIdentitySummary,
   type LoginResponse,
   type OAuthLoginRequest,
+  type PlayerSave,
   type WeChatLoginRequest,
 } from '@farm-game/shared';
 import {
   ensurePlayer,
   generatePlayerId,
   IdentityAlreadyBoundError,
-  InMemoryPlayerRepo,
 } from './repo.js';
+import type { PlayerRepo } from '../repositories/player-repo.js';
 import { isVerifiedAuth } from './jwt.js';
 
 const MOCK_CODE_PREFIX = 'mock_';
 
 interface AuthRoutesDeps {
-  repo: InMemoryPlayerRepo;
+  repo: PlayerRepo;
+  /**
+   * Optional PostgreSQL-backed repo. When provided, `/auth/wechat`,
+   * `/auth/oauth` and `/auth/bind` write to Postgres (so the player
+   * created by login is visible to subsequent `/farm/*` commands).
+   * When omitted, all routes fall back to `repo` (the in-memory test repo).
+   */
+  dbRepo?: PlayerRepo;
+}
+
+/**
+ * Construct a fresh PlayerSave for a brand-new login. Seeds 6 unlocked
+ * plots and 200 gold (ADR-0002 D9). `initialIdentity` is the public
+ * summary of the identity that triggered the create — populating it
+ * keeps the first /player/info response self-contained.
+ */
+function makeFreshSave(playerId: string, identity: Pick<AuthIdentity, 'provider'>): PlayerSave {
+  return createDefaultPlayerSave({
+    playerId,
+    initialIdentity: toIdentitySummary({
+      provider: identity.provider,
+      subject: '',
+      boundAt: Date.now(),
+    }),
+  });
 }
 
 const wechatBodySchema = {
@@ -79,6 +105,7 @@ const bindBodySchema = {
 } as const;
 
 export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Promise<void> {
+  const writeRepo = deps.dbRepo ?? deps.repo;
   app.post<{ Body: WeChatLoginRequest; Reply: ApiResponse<LoginResponse> }>(
     '/auth/wechat',
     { schema: { body: wechatBodySchema } },
@@ -96,11 +123,11 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
         subject,
       };
 
-      const player = await ensurePlayer(deps.repo, identity);
+      const player = await ensurePlayer(writeRepo, identity, (id) => makeFreshSave(id, identity));
       void guestPlayerId; // Phase 2: implement the real merge flow.
 
       const issued = await issueToken(app, player);
-      return { ok: true, data: { token: issued.token, player, auth: issued.auth } };
+      return { ok: true, data: { token: issued.token, player, auth: issued.auth, serverNow: Date.now(), revision: player.revision } };
     },
   );
 
@@ -129,9 +156,9 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
 
       const subject = isMock ? idToken : `mock_${provider}_${idToken.slice(0, 16)}`;
       const identity: Pick<AuthIdentity, 'provider' | 'subject'> = { provider, subject };
-      const player = await ensurePlayer(deps.repo, identity);
+      const player = await ensurePlayer(writeRepo, identity, (id) => makeFreshSave(id, identity));
       const issued = await issueToken(app, player);
-      return { ok: true, data: { token: issued.token, player, auth: issued.auth } };
+      return { ok: true, data: { token: issued.token, player, auth: issued.auth, serverNow: Date.now(), revision: player.revision } };
     },
   );
 
@@ -144,7 +171,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
         reply.code(401);
         return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'token missing identities' };
       }
-      const player = await deps.repo.findByPlayerId(auth.sub);
+      const player = await writeRepo.findByPlayerId(auth.sub);
       if (!player) {
         reply.code(404);
         return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'player not found' };
@@ -159,7 +186,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
       const subject = isMock ? token : `mock_${provider}_${token.slice(0, 16)}`;
 
       try {
-        await deps.repo.addIdentity(player.playerId, { provider, subject, tenantId, boundAt: Date.now() });
+        await writeRepo.addIdentity(player.playerId, { provider, subject, tenantId, boundAt: Date.now() });
       } catch (err) {
         if (err instanceof IdentityAlreadyBoundError) {
           reply.code(409);
@@ -171,7 +198,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
         }
         throw err;
       }
-      const updated = await deps.repo.findByPlayerId(player.playerId);
+      const updated = await writeRepo.findByPlayerId(player.playerId);
       return { ok: true, data: { player: updated! } };
     },
   );
@@ -185,12 +212,15 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
     '/auth/identities/me',
     { preHandler: app.authenticate },
     async (req): Promise<ApiResponse<{ identities: AuthIdentity[] }>> => {
-      const identities = await deps.repo.findIdentities(req.user.sub);
+      const identities = await writeRepo.findIdentities(req.user.sub);
       return { ok: true, data: { identities } };
     },
   );
 
-  app.get('/auth/_meta', async () => ({ ok: true, data: { protocolVersion: PROTOCOL_VERSION } }));
+  app.get('/auth/_meta', async () => ({
+    ok: true,
+    data: { protocolVersion: PROTOCOL_VERSION, serverNow: Date.now() },
+  }));
 }
 
 /**

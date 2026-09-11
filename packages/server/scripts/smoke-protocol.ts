@@ -1,0 +1,129 @@
+/**
+ * Protocol smoke — boot @farm-game/server on an ephemeral port, run the
+ * canonical Phase 1 handshake chain via @farm-game/client-app's ApiClient,
+ * then exit 0 on success / non-zero on any contract mismatch.
+ *
+ *   1. GET  /healthz             — protocol version echo
+ *   2. POST /auth/wechat         — stub login → JWT + AuthContext
+ *   3. GET  /crop/configs        — 5 crops from shared CROPS
+ *   4. GET  /player/info         — bearer-protected; returns the save from #2
+ *   5. POST /farm/unlock         — bearer-protected; flips plot[6].unlocked
+ *      (requires MAIN_DB_URL; otherwise asserts the route returns 503 NOT_IMPLEMENTED)
+ *   6. GET  /admin/healthz       — admin boundary; must answer even with ENABLE_ADMIN=0
+ *
+ * Run: `pnpm --filter @farm-game/server smoke` (or `pnpm smoke` at root).
+ */
+
+import { buildApp } from '../src/app.js';
+import { buildMainDbOptions } from '../src/db/mikro-orm.config.js';
+import { loadConfig } from '../src/config.js';
+import { MikroORM } from '@mikro-orm/postgresql';
+import { ApiClient } from '@farm-game/client-app';
+import { Platform, PROTOCOL_VERSION } from '@farm-game/shared';
+
+const CHECKS: Array<{ name: string; pass: boolean; detail?: unknown }> = [];
+
+function expect(name: string, condition: boolean, detail?: unknown): void {
+  CHECKS.push({ name, pass: condition, detail });
+  // eslint-disable-next-line no-console
+  console.log(`${condition ? '✔' : '✖'} ${name}${detail !== undefined ? `  ${JSON.stringify(detail)}` : ''}`);
+}
+
+async function main(): Promise<number> {
+  const config = loadConfig({
+    port: 0,
+    host: '127.0.0.1',
+    jwtSecret: 'smoke-secret',
+    enableAdmin: false,
+    enableMockAuth: true,
+  });
+
+  const dbUrl = process.env.MAIN_DB_URL ?? process.env.TEST_DB_URL;
+  let orm: MikroORM | undefined;
+  if (dbUrl) {
+    orm = await MikroORM.init(buildMainDbOptions(dbUrl));
+  }
+
+  const app = await buildApp({ config, orm });
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const addr = app.server.address();
+  if (!addr || typeof addr !== 'object') {
+    // eslint-disable-next-line no-console
+    console.error('server did not return an address');
+    return 2;
+  }
+  const baseUrl = `http://127.0.0.1:${addr.port}`;
+  const client = new ApiClient({ baseUrl, platform: Platform.WeChatMini });
+
+  try {
+    // 1. /healthz
+    const health = await client.getHealth();
+    expect('GET /healthz ok', health.ok === true);
+    expect('PROTOCOL_VERSION matches shared', health.protocolVersion === PROTOCOL_VERSION, {
+      server: health.protocolVersion,
+      shared: PROTOCOL_VERSION,
+    });
+
+    // 2. /auth/wechat
+    const login = await client.loginWeChat({ code: `mock_smoke_${Date.now()}` });
+    expect('POST /auth/wechat ok', login.ok === true);
+    if (!login.ok) throw new Error(login.message);
+    const { token, player } = login.data;
+    expect('login.player.playerId is uuid-like', /^[0-9a-f-]{8,}$/i.test(player.playerId), player.playerId);
+    expect(
+      'login.player.identities[0] carries provider only (no subject)',
+      player.identities[0]?.provider === 'weChatMini' && !('subject' in (player.identities[0] ?? {})),
+    );
+    client.setToken(token);
+
+    // 3. /crop/configs
+    const crops = await client.getCropConfigs();
+    expect('GET /crop/configs ok', crops.ok === true);
+    if (!crops.ok) throw new Error(crops.message);
+    expect('crop count == 5', crops.data.crops.length === 5);
+
+    // 4. /player/info
+    const me = await client.getPlayerInfo();
+    expect('GET /player/info ok', me.ok === true);
+    if (!me.ok) throw new Error(me.message);
+    expect('me.plots.length == 24', me.data.plots.length === 24);
+    expect('me.gold == 200', me.data.gold === 200);
+
+    // 5. /farm/unlock — DB-mode passes, in-memory returns 503 NOT_IMPLEMENTED.
+    const unlock = await client.unlockPlot(6);
+    if (unlock.ok) {
+      expect('POST /farm/unlock ok', true);
+      expect('plot[6] now unlocked', unlock.data.payload.plot.unlocked === true);
+      expect('unlock.revision >= 1', unlock.data.revision >= 1);
+      expect('unlock.serverNow present', typeof unlock.data.serverNow === 'number');
+    } else {
+      expect('POST /farm/unlock deferred without DB', unlock.code === 4001 /* NOT_IMPLEMENTED */);
+    }
+
+    // 6. ENABLE_ADMIN=0 admin boundary
+    const adminHealth = await fetch(`${baseUrl}/admin/healthz`);
+    expect('GET /admin/healthz == 200', adminHealth.status === 200);
+    const adminBody = (await adminHealth.json()) as { enabled: boolean };
+    expect('admin.enabled == false', adminBody.enabled === false);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('smoke threw:', err);
+    await app.close();
+    if (orm) await orm.close(true);
+    return 1;
+  }
+
+  await app.close();
+  if (orm) await orm.close(true);
+
+  const failed = CHECKS.filter((c) => !c.pass);
+  // eslint-disable-next-line no-console
+  console.log(`\nsmoke summary: ${CHECKS.length - failed.length}/${CHECKS.length} passed`);
+  return failed.length === 0 ? 0 : 1;
+}
+
+main().then((code) => process.exit(code)).catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error('smoke crashed:', err);
+  process.exit(2);
+});

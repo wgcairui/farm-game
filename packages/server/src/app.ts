@@ -17,11 +17,15 @@ import {
   PROTOCOL_VERSION_MAJOR,
   type ApiResponse,
 } from '@farm-game/shared';
+import type { MikroORM } from '@mikro-orm/core';
 import { authRoutes } from './auth/routes.js';
 import { playerRoutes } from './player/routes.js';
 import { cropRoutes } from './crop/routes.js';
 import { farmRoutes } from './farm/routes.js';
 import { InMemoryPlayerRepo } from './auth/repo.js';
+import type { PlayerRepo } from './repositories/player-repo.js';
+import { MikroORMPlayerRepo } from './repositories/MikroORMPlayerRepo.js';
+import { makeMikroOrmTransactionRunner } from './repositories/transaction.js';
 import { isVerifiedAuth, type VerifiedAuth } from './auth/jwt.js';
 import { mountAdmin } from './admin/index.js';
 import type { ServerConfig } from './config.js';
@@ -29,8 +33,17 @@ import { logger } from './obs/logger.js';
 
 export interface BuildAppOptions {
   config: ServerConfig;
-  /** Override repo for tests. */
-  repo?: InMemoryPlayerRepo;
+  /**
+   * Override repo for tests. Defaults to InMemoryPlayerRepo. For production,
+   * `index.ts` boots a MikroORM and passes a `MikroORMPlayerRepo` here.
+   */
+  repo?: PlayerRepo;
+  /**
+   * Optional ORM handle — when present, the app schedules a graceful
+   * disconnect via `app.addHook('onClose', ...)`. The MikroORM player repo
+   * is constructed from the same ORM by the caller; `app` does not own it.
+   */
+  orm?: MikroORM;
 }
 
 declare module 'fastify' {
@@ -48,7 +61,7 @@ declare module '@fastify/jwt' {
 }
 
 export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> {
-  const { config, repo = new InMemoryPlayerRepo() } = opts;
+  const { config, repo = new InMemoryPlayerRepo(), orm } = opts;
 
   const app = Fastify({
     // pino v10's `Logger<never, boolean>` generic doesn't structurally match
@@ -149,10 +162,12 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   }));
 
   // 5. Business routes.
-  await authRoutes(app, { repo });
+  const dbRepo = orm ? new MikroORMPlayerRepo(makeMikroOrmTransactionRunner(orm)) : undefined;
+  const tx = orm ? makeMikroOrmTransactionRunner(orm) : undefined;
+  await authRoutes(app, { repo, dbRepo });
   await cropRoutes(app);
-  await playerRoutes(app, { repo });
-  await farmRoutes(app, { repo });
+  await playerRoutes(app, { repo, dbRepo });
+  await farmRoutes(app, { repo, dbRepo, tx });
 
   // 6. Admin boundary.
   await mountAdmin(
@@ -164,6 +179,17 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     },
     config.enableAdmin,
   );
+
+  // 7. Optional ORM lifecycle — release DB connections on graceful close.
+  if (orm) {
+    app.addHook('onClose', async () => {
+      try {
+        await orm.close(true);
+      } catch (err) {
+        logger.warn({ err }, 'ORM close failed');
+      }
+    });
+  }
 
   return app;
 }

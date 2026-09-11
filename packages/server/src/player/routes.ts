@@ -8,15 +8,16 @@
 
 import type { FastifyInstance } from 'fastify';
 import { ErrorCode, type ApiResponse, type PlayerSave } from '@farm-game/shared';
-import { InMemoryPlayerRepo } from '../auth/repo.js';
+import type { PlayerRepo } from '../repositories/player-repo.js';
 
-export async function playerRoutes(app: FastifyInstance, deps: { repo: InMemoryPlayerRepo }): Promise<void> {
+export async function playerRoutes(app: FastifyInstance, deps: { repo: PlayerRepo; dbRepo?: PlayerRepo }): Promise<void> {
+  const readRepo = deps.dbRepo ?? deps.repo;
   app.get<{ Reply: ApiResponse<PlayerSave> }>(
     '/player/info',
     { preHandler: app.authenticate },
     async (req): Promise<ApiResponse<PlayerSave>> => {
       const playerId = req.user.sub;
-      const player = await deps.repo.findByPlayerId(playerId);
+      const player = await readRepo.findByPlayerId(playerId);
       if (!player) {
         return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'player not found' };
       }
