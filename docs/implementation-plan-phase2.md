@@ -57,6 +57,24 @@
 
 **出口证据**：四包构建通过；过期 JWT、mock 生产启动、非法参数、协议不匹配、epoch=0、浇水边界都有自动化测试。ADR 与协议文档一致。
 
+#### G0 实施记录
+
+- **ADR**：`docs/adr/0001-g0-contract-and-security-baseline.md`（决策 D1–D8）。
+- **基线测试重跑**：实施开始前重新跑 `pnpm -r test` + `pnpm smoke`，不沿用历史结论。
+- **共享侧落地**：`PlayerSave` 删除 `openid`，改为 `playerId` (UUID) + `identities: AuthIdentitySummary[]`；`AuthIdentity` (server-internal) 与 `AuthIdentitySummary` (公开) 分离；`createDefaultPlayerSave({ playerId, initialIdentity? })` 接受 summary；`applyWater` 输入服务端 `now` + 当前 `matureAt`，新 `matureAt = now + ceil((matureAt - now) × 0.95)`，封顶 `crop.maxWater`；`applyWater` 失败原因：`unknown_crop` / `not_growing` / `already_ripe` / `withered` / `limit_reached` / `corrupted`；新增错误码 `TOKEN_EXPIRED=1102`、`OAUTH_PROVIDER_INVALID=2002`、`IDENTITY_ALREADY_BOUND=2003`、`WATER_LIMIT_REACHED=3006`；`ClientHello` 与 `ServerCropStolen` 改为 `playerId`。
+- **服务端落地**：Fastify 路由全部用真实类型 + JSON Schema 校验；`@fastify/jwt` 配置 `iss=farm-game` + `aud=client`，标准 `sub`/`iat`/`exp` 由插件强制校验，过期 → 401 + 1102（通过 `FST_JWT_AUTHORIZATION_TOKEN_EXPIRED` 识别），篡改 → 401 + 1101；`app.authenticate` 装饰器集中 verify + 错误映射；`app.setErrorHandler` 把 Fastify 校验/鉴权错误折叠成 `ApiResponse` 信封；`onRequest` hook 解析 `x-protocol-version`，major 不匹配 → 426 + 1200，仅 `/healthz` 与 `/admin*` 旁路；`loadConfig()` 在 production 启动时对默认 JWT/session secret、`ENABLE_MOCK_AUTH=1`、非正 `JWT_TTL_SEC` 抛 `ConfigError`；`InMemoryPlayerRepo` 新增 `addIdentity` / `removeIdentity` / `findIdentities`，by-identity 索引原子维护，跨玩家重复绑定抛 `IdentityAlreadyBoundError`；新路由 `POST /auth/bind` (Bearer JWT) 与 `GET /auth/identities/me`（owner 取回自己的 subject 快照）。
+- **代码审查与回修**：提交 `1ea87ee` 后由只读 reviewer 找到 6 HIGH（H1 subject 公开泄漏 / H2 by-identity 索引残留 / H3 bind 重复 / H4 applyWater 状态折叠 / H6 JWT_TTL_SEC NaN；H5 经审查员自降为 MEDIUM）+ 3 MEDIUM（M1 oauth stub 静默 / M5 孤儿类型 / M6 旧注释）。回修提交 `c66d6ca` 全部解决。
+- **测试计数**：`shared 26` + `server 22` + `client-mini 5` + `client-app 7` = **60/60 单测**，`pnpm smoke` **14/14**。
+- **文档同步**：`client-protocol.md` v2（错误码表 + 身份模型 + JWT 声明 + `/auth/identities/me`）、`data-schema.md` v2（AuthIdentitySummary / AuthIdentity 分离 + applyWater 算法 + 错误原因表）、`architecture.md` v2（§8 安全边界 + §9 状态表）、`monorepo-architecture.md` memory 更新。
+
+#### G0 不在本阶段
+
+- 真实微信登录（`POST /auth/wechat` 仍为 mock stub，G1 才接 `jscode2session`）
+- `/auth/oauth` 的 Apple / Google id_token 真实验证（G1）
+- DB 实体 / 迁移（G1）
+- Colyseus WS（G2）
+- 客户端接真实后端（G3）
+
 ### G1：PostgreSQL 持久化与原子领域操作
 
 **新增/修改位置**

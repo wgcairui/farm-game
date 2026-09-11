@@ -1,6 +1,6 @@
 # 客户端协议契约（Client Protocol）
 
-> 版本：v2 · 2026-09-11
+> 版本：v3 · 2026-09-11 — Phase 2 G0 review-fix：新增 `/auth/identities/me`，公开 `identities` 不再携带 `subject`，applyWater 错误原因拆分。
 > 当前 `PROTOCOL_VERSION` = `1.0.0`（major = 1）
 > 配套：[architecture.md](./architecture.md) · [state-sync.md](./state-sync.md) · [ADR-0001](./adr/0001-g0-contract-and-security-baseline.md)
 
@@ -71,12 +71,14 @@ JWT 不再携带 `platform`；平台只出现在 HTTP `x-platform` 头，影响�
 - `android` — Android App
 - `h5Reserve` — H5 预留
 
-### 2.5 玩家身份模型（ADR-0001 §1）
+### 2.5 玩家身份模型（ADR-0001 §1；review-fix H1）
 
 - 业务玩家用内部 UUID `playerId` 标识，跨平台唯一
 - `AuthIdentity { provider, subject, tenantId? }` 是登录键；一个玩家可绑定多个 provider
-- `PlayerSave.identities: AuthIdentityRef[]` 是只读快照，绑定必须经 `POST /auth/bind`
-- JWT `sub` = `playerId`，自定义 payload 字段为 `identities`
+- 公开信封（`PlayerSave.identities`、JWT `identities`）是 `AuthIdentitySummary[]`，**不含 `subject`**
+- owner 通过 `GET /auth/identities/me` 取回自己的完整 `AuthIdentity[]`（含 subject）
+- 绑定必须经 `POST /auth/bind`；重复绑定到不同玩家 → `2003 IDENTITY_ALREADY_BOUND`
+- JWT `sub` = `playerId`
 - `openid` 永不进入客户端公开协议（详见 [data-schema.md §3](./data-schema.md)）
 
 ## 3. HTTP 路由
@@ -111,6 +113,14 @@ JWT 不再携带 `platform`；平台只出现在 HTTP `x-platform` 头，影响�
   - `1100 NOT_AUTHENTICATED`
   - `2002 OAUTH_PROVIDER_INVALID` — mock token 被拒
   - `2003 IDENTITY_ALREADY_BOUND` — 该 (provider, subject, tenant) 已绑定到另一玩家
+
+### 3.4a `GET /auth/identities/me`
+- Auth：Bearer JWT
+- 响应：`ApiResponse<{ identities: AuthIdentity[] }>` —— 调用者**自己**的完整身份（含 subject）
+- 错误：
+  - `1100 NOT_AUTHENTICATED`
+  - `1101 INVALID_TOKEN`
+- 用途：客户端展示"我绑定了哪些 provider"或发起解绑时使用；其他玩家的 subject 永远不暴露。
 
 ### 3.5 `GET /player/info`
 - Auth：Bearer JWT
@@ -184,7 +194,7 @@ interface JwtClaims {
   exp: number;                // 由 @fastify/jwt 自动写入（TTL=7d）
   iss: 'farm-game';           // 由 fastifyJwt.sign.iss 配置注入
   aud: 'client';              // 由 fastifyJwt.sign.aud 配置注入
-  identities: AuthIdentityRef[];  // 登录时的身份快照
+  identities: AuthIdentitySummary[];  // 登录时的身份快照（不含 subject）
 }
 ```
 

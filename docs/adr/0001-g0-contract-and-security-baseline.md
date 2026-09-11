@@ -163,6 +163,18 @@ TOKEN_EXPIRED: 1102,       // ★ G0 新增
 - Cocos / RN 联调（G3）
 - admin 面板实装（Phase 3）
 
+## 7. 实施状态
+
+| 提交 | 范围 |
+|---|---|
+| `1ea87ee` Phase 2 G0 | D1–D8 全部落地（player/provider 分离 / 标准 JWT / mock 隔离 / 真 Fastify 类型 / applyWater 剩余时间 / 协议 426 / TOKEN_EXPIRED / ApiResponse 信封） |
+| `c66d6ca` G0 review-fix | 6 HIGH + 3 MEDIUM 审查回修：`AuthIdentitySummary`/`AuthIdentity` 分离（H1）、by-identity 索引原子维护 + `addIdentity`/`removeIdentity`（H2）、`/auth/bind` 经 `addIdentity` 去重（H3）、applyWater 失败原因拆分 + `corrupted` 拒绝 NaN/Infinity（H4）、`JWT_TTL_SEC` NaN/≤0 校验（H6）、生产 oauth stub 警告（M1）、删除孤儿类型（M5）、更正协议旁路注释（M6） |
+
+**G0 测试与冒烟计数（c66d6ca 后）**：`shared 26` + `server 22` + `client-mini 5` + `client-app 7` = **60/60 单测**；`pnpm smoke` **14/14**。
+
+**G0 不引入、不承诺**：真实 OAuth 验证（G1）、数据库实体（G1）、Colyseus WS（G2）、admin 面板（Phase 3）。
+
+
 ## 7. 验收证据
 
 - `pnpm -r build` 通过

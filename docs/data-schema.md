@@ -1,6 +1,6 @@
 # 数据表设计
 
-> 更新：v2 · 2026-09-11 — Phase 2 G0：移除 `PlayerSave.openid`，新增 `AuthIdentity`；浇水规则修正（ADR-0001）。
+> 更新：v3 · 2026-09-11 — Phase 2 G0 review-fix：`AuthIdentitySummary` (公开) 与 `AuthIdentity` (server-internal) 分离；`applyWater` 失败原因拆分；6 类 NaN/Infinity 拒绝。
 >
 > 所有类型**单一事实源**在 [`packages/shared/src/types/`](../packages/shared/src/types/)。本文件保留策划视角的设计意图与历史记录；代码以 shared 为准。
 
@@ -116,6 +116,7 @@ interface PlayerSave {
 // packages/shared/src/types/auth-identity.ts
 type AuthProvider = 'weChatMini' | 'ios' | 'android' | 'h5';
 
+/** Server-internal — full provider subject. NEVER crosses the public envelope. */
 interface AuthIdentity {
   provider: AuthProvider;
   subject: string;            // 微信 openid / Apple sub / Google sub
@@ -123,17 +124,23 @@ interface AuthIdentity {
   boundAt: number;
 }
 
-interface AuthIdentityRef {
+/** Public projection — embedded in PlayerSave.identities and JWT identities. */
+interface AuthIdentitySummary {
   provider: AuthProvider;
-  subject: string;
+  tenantId?: string;
   boundAt: number;
+  // 注意：故意没有 `subject` 字段。客户端若要看自己的 subject，必须经
+  // 已认证的 GET /auth/identities/me 拉回。
 }
 ```
 
+- `PlayerSave.identities: AuthIdentitySummary[]` 是公开投影，**不携带 `subject`**
 - 一个玩家可绑定多个 `AuthIdentity`；典型场景：微信 + Apple 同一账号
 - 绑定必须经 `POST /auth/bind`（Bearer JWT），不接受客户端伪造的身份
 - 重复绑定到不同玩家 → `2003 IDENTITY_ALREADY_BOUND`
+- owner 通过 `GET /auth/identities/me` 取回自己的完整 `AuthIdentity[]`（含 subject）
 - `PlayerRepo.findByIdentity({ provider, subject, tenantId })` 是登录键；不使用 `playerId` 作为登录键
+- 仓储层维护 by-identity 索引时，`addIdentity` 跨玩家去重，`removeIdentity` 释放索引以便重新绑定
 
 ---
 
@@ -194,29 +201,29 @@ const now = tm.now();
 
 ---
 
-## 七、浇水算法（ADR-0001 §5）
+## 七、浇水算法（ADR-0001 §5；review-fix H4）
 
 ```typescript
 // packages/shared/src/logic/growth.ts
 export const WATER_DISCOUNT_PER = 0.05; // 5% of *remaining* time, per PRD §2.2.3
 
+export type ApplyWaterFailure =
+  | 'unknown_crop'
+  | 'not_growing'        // status='empty'
+  | 'already_ripe'       // status='ready'
+  | 'withered'           // status='withered'
+  | 'limit_reached'
+  | 'corrupted';         // matureAt 缺失或 NaN/Infinity
+
 export function applyWater(plot, now):
   | { ok: true; value: { matureAt: number; waterCount: number } }
-  | { ok: false; reason: 'unknown_crop' | 'not_growing' | 'already_ripe' | 'limit_reached' }
-{
-  // 1. plot 必须 status='growing' + 有 matureAt + cropId 在 CROPS
-  // 2. plot.waterCount < crop.maxWater
-  // 3. matureAt > now（已成熟则拒）
-  // 4. remaining = matureAt - now
-  // 5. discounted = ceil(remaining * 0.95)
-  // 6. matureAt_new = now + discounted
-  // 7. waterCount_new = waterCount + 1
-}
+  | { ok: false; reason: ApplyWaterFailure }
 ```
 
-- 每次浇水对"剩余时间"打 5% 折扣，不是对总时长
+- 每次浇水对"剩余时间"打 5% 折扣，不是对总时长：`matureAt_new = now + ceil((matureAt - now) * 0.95)`
 - `maxWater` 默认 3；超过返回 `WATER_LIMIT_REACHED`（错误码 3006）
-- 已成熟的地块不能再浇：返回 `already_ripe`（错误码 3003 `CROP_NOT_RIPE` 复用）
+- `status='ready'` → `already_ripe`（错误码 3003 `CROP_NOT_RIPE` 复用）；`status='withered'` → `withered`（错误码 3006 复用，需服务端另行映射）
+- `matureAt` 缺失或非有限数 → `corrupted`；拒绝写入避免把 NaN 传播到下一状态
 - 与服务器权威 `now` 一同传入，禁止客户端传入本地时间
 
 ---

@@ -1,8 +1,8 @@
 # 架构总览（Architecture Overview）
 
-> 版本：v2 · 2026-09-11
-> 状态：Phase 2 G0 已落地（51 单测 / 14 smoke 全绿，详见 [ADR-0001](./adr/0001-g0-contract-and-security-baseline.md)）
-> 配套文档：[deployment.md](./deployment.md) · [client-protocol.md](./client-protocol.md) · [state-sync.md](./state-sync.md) · [admin-integration.md](./admin-integration.md)
+> 版本：v3 · 2026-09-11
+> 状态：Phase 2 G0 已落地 + 代码审查回修完成（60 单测 / 14 smoke 全绿；提交 `1ea87ee` + `c66d6ca`）
+> 配套文档：[deployment.md](./deployment.md) · [client-protocol.md](./client-protocol.md) · [state-sync.md](./state-sync.md) · [admin-integration.md](./admin-integration.md) · [ADR-0001](./adr/0001-g0-contract-and-security-baseline.md) · [实施计划](./implementation-plan-phase2.md)
 
 ## 1. 系统定位
 
@@ -160,17 +160,20 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 | 能力 | 状态 |
 |---|---|
 | pnpm monorepo（shared / server / client-mini / client-app） | ✅ 已 build |
-| `@farm-game/shared` 协议契约（HTTP/WS/Auth/ErrorCode/AuthIdentity） | ✅ 21 单测全绿 |
-| Fastify HTTP（/auth/wechat, /auth/oauth, /auth/bind, /crop/configs, /player/info, /farm/unlock, /healthz） | ✅ 18 单测 + 14 smoke 全绿 |
+| `@farm-game/shared` 协议契约（HTTP/WS/Auth/ErrorCode/AuthIdentity） | ✅ 26 单测全绿 |
+| Fastify HTTP（/auth/wechat, /auth/oauth, /auth/bind, /auth/identities/me, /crop/configs, /player/info, /farm/unlock, /healthz） | ✅ 22 单测 + 14 smoke 全绿 |
 | 真实 Fastify 类型 + JSON Schema 校验 | ✅ routes 完全类型化，`any` 仅在 logger 边界一处 |
 | 标准 JWT `sub`/`iat`/`exp` + `iss`/`aud` | ✅ `app.jwt.sign/verify` 配置注入 |
 | 协议版本 426 校验 | ✅ `onRequest` hook + `x-protocol-version` |
-| Mock auth 隔离 + production fail-closed | ✅ `ConfigError` 抛错 |
-| `PlayerRepo.findByIdentity`（provider+subject）替代 `findByOpenid` | ✅ G0 完成；G1 接 MikroORM |
-| `applyWater` 折扣作用于"剩余时间" | ✅ 5 个新单测覆盖 |
-| 新错误码（TOKEN_EXPIRED, WATER_LIMIT_REACHED, OAUTH_*, IDENTITY_ALREADY_BOUND） | ✅ |
+| Mock auth 隔离 + production fail-closed | ✅ `ConfigError` 抛错（含 JWT_TTL_SEC NaN/≤0 校验） |
+| `AuthIdentity` (server-internal) vs `AuthIdentitySummary` (公开) 分离 | ✅ 公开信封不携带 `subject`，仅 owner 经 `/auth/identities/me` 可见 |
+| `PlayerRepo` by-identity 索引原子维护（`addIdentity` / `removeIdentity` / `findIdentities`） | ✅ |
+| `applyWater` 折扣作用于"剩余时间"，6 类失败原因（含 `corrupted` 对 NaN/Infinity 拒绝） | ✅ |
+| 新错误码（TOKEN_EXPIRED=1102, OAUTH_PROVIDER_INVALID=2002, IDENTITY_ALREADY_BOUND=2003, WATER_LIMIT_REACHED=3006, PROTOCOL_VERSION_MISMATCH=1200） | ✅ |
+| 代码审查回修（subject 隐私 / 索引原子 / applyWater 硬化） | ✅ 提交 `c66d6ca` |
 | `@colyseus/admin` 隔离子模块（ENABLE_ADMIN=0 默认） | ✅ 占位 + 拒绝策略 |
 | MikroORM 主库配置 + 实体 + 迁移 | ⌛ G1（ADR-0001 §6） |
+| 真实微信 jscode2session + Apple/Google id_token 验证 | ⌛ G1 |
 | Colyseus WS 房间 + 鉴权 + 重连 | ⌛ G2 |
 | 客户端接真实后端 | ⌛ G3 |
 | Cocos Creator 工程 | ⌛ G4 |
