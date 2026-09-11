@@ -1,8 +1,9 @@
 # Cocos Creator 集成与实施指南
 
-> 更新：2026-09-10。本文是实施要求，不是工程完成报告。
-> **v24 上轮工程检查通过，本轮桌面静态视觉复审未通过。** 相关素材只能作为开发占位，不得直接冻结为最终美术。
-> 问题证据、12 项修正动作及关闭条件见 [视觉修正实施计划](./visual-repair-plan-v24.md)。本轮未重新验收移动端画面或运行 Cocos 工程。
+> 更新：2026-09-11。
+> **Phase 1 状态**：仓库已重构为 pnpm monorepo。Cocos Creator 3.8 工程**未创建**；`packages/client-mini` 仅含业务代码 + `cc` 兼容桩，业务系统可在 Node/jest 下脱离 Cocos 跑通。
+> **Phase 4**：建 Cocos Creator 3.8 工程，把 `client-mini/src/cc/*` 切到真实 `cc` 包；业务代码零改动。
+> 视觉问题证据、12 项修正动作及关闭条件见 [视觉修正实施计划](./visual-repair-plan-v24.md)。
 
 ## 1. 实施顺序与边界
 
@@ -14,19 +15,32 @@
 | D：资源冻结 | 逐对象导出 PNG，校验透明边缘，记录清单及版本，打包图集 | 已通过 A–C；资源可追溯 |
 | E：正式接入 | 场景、独立命中层、业务、动画、音效与设备适配 | 编译、功能、视觉和设备测试分别通过 |
 
-可并行做工程初始化、灰盒种植流程、存档和临时资源导出；正式布局冻结依赖 A，正式美术冻结依赖 A–C。不要用“网页审计通过”跳过客户端验收，也不要继续按有缺陷的 v24 图层整体烘焙。
+## 2. 工程准备
+
+### 2.1 Phase 1（当前）状态
+
+- `packages/client-mini/src/cc/` 提供 `ccclass` / `Component` / `Node` / `sys` / `EventTarget` 的 stub；业务代码 `import { ... } from '../cc'` 在 Node 下能编译与跑通（已用 5 个单测覆盖核心循环）
+- 不存在真实的 Cocos Creator 工程、`project.json` 或 `Main.scene`；本轮 Phase 1 不创建
+- 真实工程创建留 Phase 4（详见 [architecture.md §9](./architecture.md) 的阶段路线）
+
+### 2.2 Phase 4 切换路径
+
+届时把每个 `import { ... } from '../cc'` 改为 `import { ... } from 'cc'` 即可，业务代码零改动。验证步骤：
+1. `pnpm -F @farm-game/client-mini build` 在 Node 下继续通过
+2. Cocos 编辑器内打开 `packages/client-mini/assets/scenes/Main.scene`
+3. 把 `GameApp` 挂到 Canvas 节点
+4. 微信开发者工具里跑通 buy→plant→harvest→sell
+
+### 2.3 Phase 1 已使用的业务系统
+
+- `EconomySystem`、`InventorySystem`、`FarmSystem`、`ShopSystem` — 与原 `scripts/systems/*` 同语义，事件流不变（`@farm-game/shared` EventBus）
+- `HeadlessGameApp` (`packages/client-mini/src/runtime/headless.ts`) — 不依赖 Cocos 的装配，jest 与 smoke 入口
+
+可并行做工程初始化、灰盒种植流程、存档和临时资源导出；正式布局冻结依赖 A，正式美术冻结依赖 A–C。不要用"网页审计通过"跳过客户端验收，也不要继续按有缺陷的 v24 图层整体烘焙。
 
 原按周数排列的时间表不再作为完成承诺。每个阶段按证据关闭，缺陷待修不等于实施已完成。
 
-## 2. 工程准备
-
-- 使用 Cocos Creator 2D，选定并记录实际使用的 3.8.x 版本；平台工具要求按该版本与发布目标核对。
-- 可将客户端放在独立目录 `/Users/cairui/Code/FarmGame`；先确认目标目录内容，不覆盖已有工程。
-- TypeScript 为内置支持，无需另设“开启 TypeScript”步骤。
-- 本仓库 `scripts/` 还包含 Python 评分工具。只挑选所需 `.ts` 业务文件、保留相对目录；不要使用整个目录的通配复制命令。
-- 现有业务骨架不是已验证的 Cocos 组件。接入前核对构造方式、存档字段、事件订阅和生命周期，完成编译与测试；不以示例代码代替实际接口验证。
-
-建议目录：
+## 2.4 工程目录（Cocos Creator 工程，Phase 4）
 
 ```text
 FarmGame/assets/

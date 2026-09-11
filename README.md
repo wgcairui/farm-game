@@ -1,76 +1,95 @@
 # Farm Game
 
-类似 QQ 经典农场的 2D 社交休闲游戏。先做微信小程序，再移植 iOS / Android。
+类似 QQ 经典农场的 2D 社交模拟经营游戏。**全局后端**服务微信小游戏（Cocos 3.8）+ 未来 iOS / Android App（React Native）。
 
-## 当前设计状态
+## 当前状态
 
-**v24 为工程检查通过、静态视觉复审未通过的原型基线，不是最终美术定稿。** 2026-09-10 已实际查看最终稿与对比图；栅栏遮地、建筑透视、树林纵深及右侧布局等 12 项修正待实施。本次仅更新文档，未修改设计稿。
+**Phase 1 骨架已落地（2026-09-11）**：
 
-实施入口：[视觉修正实施计划](./docs/visual-repair-plan-v24.md) → [Cocos 集成指南](./docs/cocos-integration.md)。先修正并复验视觉，再冻结正式资源；灰盒功能验证可并行。
+- pnpm monorepo（4 packages）
+- `packages/shared` 协议契约：15 单测全绿
+- `packages/server` Fastify HTTP：4 路由 + admin 边界 + 7 单测 + smoke 13/13 全过
+- `packages/client-mini` Cocos 兼容层 + headless 业务系统：5 单测覆盖核心循环
+- `packages/client-app` RN API + GameStore + 类型契约：7 单测
+- 5 份架构文档（[docs/architecture.md](./docs/architecture.md) · [deployment.md](./docs/deployment.md) · [client-protocol.md](./docs/client-protocol.md) · [state-sync.md](./docs/state-sync.md) · [admin-integration.md](./docs/admin-integration.md)）
 
-## 技术栈
+**视觉规范未关闭**：[visual-repair-plan-v24.md](./docs/visual-repair-plan-v24.md) 仍按 v25 路线推进；本 PR 不动设计稿。
 
-- 引擎：Cocos Creator 2D（待定 LTS 版本）
-- 语言：TypeScript
-- 服务端：LeanCloud（中国服）或 Firebase（海外服）
-- 美术：2D 卡通，**2:1 dimetric**（二测投影，轴角 ≈26.565°）
-- 状态机：作物生长 / 任务 / 每日重置
-
-## 目录结构
+## 仓库结构
 
 ```
 farm-game/
-├── assets/                  # Cocos 资源（图片、音频、prefab）
-│   ├── sprites/             # 贴图
-│   ├── audio/               # 音效 / BGM
-│   └── fonts/               # 字体
-├── scenes/                  # Cocos 场景文件
-├── prefab/                  # 预制体
-├── scripts/                 # TypeScript 脚本
-│   ├── core/                # 全局单例：GameApp、EventBus、TimeManager
-│   ├── systems/             # 业务系统：FarmSystem、ShopSystem、InventorySystem
-│   ├── ui/                  # UI 控制器
-│   └── utils/               # 工具函数
-├── design-preview/           # 设计原型与待验收美术
-│   ├── farm-v24.html         # ⭐ 农场主页场景（响应式 SVG + 独立命中层）
-│   ├── gen_v24.py            #    场景生成器（SVG 结构/布局审计）
-│   ├── index.html            #    5 页面原型（主页/种植/仓库/商店/好友）
-│   ├── final-v24.png         #    692×1218 基准渲染图
-│   ├── mobile-v24-*.png      #    375/390/430px 移动端验证图
-│   └── COMPARE-v24.png       #    与参考图并排对比
-├── docs/                     # 设计文档（本目录）
-└── project.json              # Cocos 项目配置
+├── packages/
+│   ├── shared/              # 客户端/服务端共享：types / protocol / time / eventbus / logic
+│   ├── server/              # Fastify HTTP + Colyseus WS + MikroORM 主库 + admin 占位
+│   ├── client-mini/         # Cocos 微信小游戏：cc stub + 业务系统 + headless runtime
+│   └── client-app/          # React Native iOS/Android：api + GameStore（无 RN 依赖）
+├── scripts/
+│   ├── smoke-protocol.ts    # 端到端 smoke：跑 4 个 HTTP 路由，验证 PROTOCOL_VERSION
+│   └── seed-admin.ts        # Phase 3 admin seed 占位
+├── docs/                    # 5 架构文档 + 视觉规范 + Cocos 集成指南
+├── design-preview/          # v25 视觉候选 + Python 工具（gitignore 历史版本）
+├── assets/                  # 美术源（与设计稿/最终 Cocos 资源共用）
+├── package.json             # pnpm workspace 根
+├── pnpm-workspace.yaml
+└── tsconfig.base.json
 ```
+
+## 快速开始
+
+```bash
+pnpm install                       # 安装 workspace 依赖
+pnpm -r build                      # shared + server + client-mini + client-app 全部 tsc 通过
+pnpm -r test                       # shared 15 + server 7 + client-mini 5 + client-app 7 = 34/34 全绿
+pnpm smoke                         # 13/13 协议校验通过
+```
+
+## 客户端矩阵
+
+| 客户端 | 阶段 | 启动方式 |
+|---|---|---|
+| 微信小游戏（Cocos 3.8） | Phase 4 起建 Cocos 工程 | `pnpm --filter @farm-game/client-mini build` |
+| iOS / Android App（React Native） | Phase 5 起建 RN 工程（expo prebuild） | `pnpm --filter @farm-game/client-app build` |
+| H5（预留） | Phase 6+ | 同 client-mini，跑在 Cocos H5 内核 |
+
+## 服务端矩阵
+
+| 服务 | 角色 | Phase 1 状态 |
+|---|---|---|
+| api (Fastify HTTP) | /auth, /crop, /player, /farm, /healthz | ✅ 可启动 |
+| ws (Colyseus) | 实时房间（Phase 2） | ⌛ 占位 |
+| admin (@colyseus/admin) | 后台面板 | ⌛ ENABLE_ADMIN=0 占位 |
+| postgres-main | MikroORM 业务库 | ⌛ docker compose |
+| postgres-admin | Drizzle admin 库 | ⌛ docker compose |
+| redis | Presence / Driver / 缓存 | ⌛ docker compose |
 
 ## 文档索引
 
-设计
-- [**视觉修正实施计划 v24**](./docs/visual-repair-plan-v24.md) — 12 项问题、实施顺序、阶段关卡与验收证据
-- [**主页场景设计规范 v24**](./docs/scene-spec-v24.md) — 投影/图层/地块几何/响应式命中层/审计与评分更正 ⭐
-- [设计规范 v1.0](./docs/design-spec.md) — 通用组件与 token（弹层页面适用）
+**架构**
+- [架构总览](./docs/architecture.md) ⭐
+- [部署手册](./docs/deployment.md)
+- [客户端协议契约](./docs/client-protocol.md)
+- [状态同步策略](./docs/state-sync.md)
+- [@colyseus/admin 集成](./docs/admin-integration.md)
+
+**视觉 / 设计**
+- [视觉修正实施计划 v24](./docs/visual-repair-plan-v24.md)
+- [主页场景设计规范 v24](./docs/scene-spec-v24.md)
 - [Cocos 集成指南](./docs/cocos-integration.md)
 - [AI 出图报告](./docs/ai-art-report.md) · [出图提示词](./docs/ai-art-prompts.md)
-- [交付总结](./DELIVERY.md)
 
-策划 / 技术
+**策划 / 数据**
 - [功能清单 (MVP)](./docs/mvp-features.md)
 - [数据表设计](./docs/data-schema.md)
 - [技术选型清单](./docs/tech-stack.md)
 - [线下农场架构](./docs/physical-farm-architecture.md)
+- [v25 Subagent 实施计划](./docs/implementation-plan-v25-subagents.md)
 
-## 设计稿自检
+## Phase 2+ 路线
 
-```bash
-cd design-preview
-python3 gen_v24.py --audit                  # XML/引用/布局/关键间距检查
-python3 gen_v24.py farm-v24.html            # 重新生成响应式设计稿
-python3 gen_v24.py --layout                 # 导出 33 项设计意图坐标表
-python3 ../scripts/visual_score.py /Users/cairui/Downloads/image.png final-v24.png
-```
-
-## 路线
-
-1. **Phase 1（4-6 周）单机 MVP** — 种/长/收/卖 + 存档
-2. **Phase 2（3-4 周）社交版** — 好友 + 偷菜 + 排行榜
-3. **Phase 3（2-3 周）小程序上线**
-4. **Phase 4（3-4 周）iOS / Android 移植**
+- **Phase 2**：MikroORM 实体 + 迁移实装；Colyseus FarmRoom（schema + clock + message handlers）；好友/偷菜；Redis Presence
+- **Phase 3**：admin 子模块实装（Drizzle 连接 + seed 脚本 + Redis rate limiter）；admin-1 节点上线
+- **Phase 4**：建 client-mini 的 Cocos Creator 3.8 工程；`./cc/*` 切到 `cc`
+- **Phase 5**：建 client-app 的 RN 工程（expo prebuild）；Sign in with Apple / Google；IAP / Google Play Billing
+- **Phase 6**：多区多活 + Postgres 主从 + Redis Cluster
+- **视觉**：v25 V01-V12 修复走 [visual-repair-plan-v24.md](./docs/visual-repair-plan-v24.md)

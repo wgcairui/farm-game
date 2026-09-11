@@ -1,0 +1,24 @@
+{
+  "name": "@farm-game/client-mini",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./runtime": "./dist/runtime/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --import tsx test/*.test.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@farm-game/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "tsx": "^4.19.2",
+    "@types/node": "^20.14.10"
+  }
+}
