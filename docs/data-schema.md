@@ -1,10 +1,17 @@
 # 数据表设计
 
+> 更新：2026-09-11 — Phase 1 抽到 `packages/shared`。
+>
+> 所有类型**单一事实源**在 [`packages/shared/src/types/`](../packages/shared/src/types/)。本文件保留策划视角的设计意图与历史记录；代码以 shared 为准。
+
 ## 一、作物配置表（CropConfig）
 
 静态配置表，写死在代码或 `assets/config/crops.json`，**不可改**。
 
 ```typescript
+// 真实定义见 packages/shared/src/types/crop.ts
+import type { CropConfig } from '@farm-game/shared';
+
 interface CropConfig {
   id: string;                  // 'carrot' | 'potato' | ...
   name: string;                // '白萝卜'
@@ -13,12 +20,14 @@ interface CropConfig {
   sellPrice: number;           // 收获售价
   growthDuration: number;      // 总生长时长（秒）
   stages: number;              // 生长阶段数（含种子→成熟）
-  unlockLevel: number;         // 玩家等级解锁门槛（Phase 2 用）
-  expReward: number;           // 收获经验（Phase 2 用）
+  maxWater: number;            // 浇水次数上限
+  witherWindow: number;        // 成熟后多久枯萎（秒）
+  seedItemId: string;          // 背包里的种子 id
+  cropItemId: string;          // 收获后入仓库的作物 id
 }
 ```
 
-### Phase 1 作物配置示例
+### Phase 1 作物配置（`CROPS` Record）
 
 | id | name | 种子价 | 售价 | 生长时长 | 阶段 |
 |---|---|---|---|---|---|
@@ -35,14 +44,18 @@ interface CropConfig {
 运行时状态，每个地块一份。
 
 ```typescript
+// packages/shared/src/types/plot.ts
+import type { PlotState } from '@farm-game/shared';
+
 interface PlotState {
-  index: number;               // 地块索引 0~35
-  unlocked: boolean;           // 是否解锁（Phase 1 默认全解锁）
-  // —— 以下三选一 ——
-  state: 'empty' | 'growing' | 'ready' | 'withered';
+  id: string;                  // 'openid:index'，稳定 id
+  index: number;               // 地块索引 0~23（v25 baseline = 4×6 = 24）
+  unlocked: boolean;           // 是否解锁
+  status: 'empty' | 'growing' | 'ready' | 'withered';
   cropId?: string;             // 已种植时填
   plantedAt?: number;          // 种植时间戳（毫秒）
-  // ready 状态是 growing 成长到 100% 的快照，无需额外字段
+  matureAt?: number;           // 成熟时间戳（毫秒）
+  waterCount: number;          // 浇水次数（默认 0）
 }
 ```
 
@@ -60,39 +73,38 @@ interface PlotState {
 整个游戏一份，存本地 + 服务端（Phase 2）。
 
 ```typescript
+// packages/shared/src/types/player.ts
+import type { PlayerSave, InventoryItem, PlayerSettings } from '@farm-game/shared';
+
 interface PlayerSave {
   version: number;             // 存档版本号，便于迁移
   playerId: string;            // 本地生成的 uuid（Phase 1 即可，Phase 2 换登录 id）
+  openid: string;              // 服务端认证 id；登录后写入
+  nickname?: string;
+  avatarUrl?: string;
   createdAt: number;
   updatedAt: number;
 
   // 资源
-  coins: number;               // 金币
-  diamonds: number;            // 钻石（Phase 2 才用）
+  gold: number;                // 金币（命名：gold 取代 coins，与 PRD §5.1 对齐）
+  gems: number;                // 钻石
 
   // 背包
-  inventory: InventoryItem[];  // 种子 + 仓库作物
+  inventory: InventoryItem[];
 
   // 农场
-  plots: PlotState[];          // 长度固定 36
+  plots: PlotState[];          // 长度固定 24（v25 baseline）
 
-  // 系统（Phase 2+ 用）
+  // 系统
   level: number;
   exp: number;
   settings: PlayerSettings;
 }
-
-interface InventoryItem {
-  itemId: string;              // 'carrot_seed' | 'carrot' | 'potato_seed' ...
-  count: number;
-}
-
-interface PlayerSettings {
-  musicVolume: number;         // 0~1
-  sfxVolume: number;           // 0~1
-  notificationsEnabled: boolean;
-}
 ```
+
+### 字段重命名说明
+
+Phase 1 起字段统一为 PRD §4.1 命名：`coins` → `gold`、`inventory` 不变、`plots` 不变。新建存档时使用 `createDefaultPlayerSave(openid)` 生成。
 
 ---
 
@@ -110,17 +122,27 @@ type ItemId =
 
 ## 五、事件总线（EventBus）
 
-解耦 UI 和业务系统的关键。
+解耦 UI 和业务系统的关键。**单一事实源在 `packages/shared/src/eventbus/EventBus.ts`**，自实现轻量 emit/on/off（替代 Cocos `cc.EventTarget`）。
 
 ```typescript
-// scripts/core/EventBus.ts
+// packages/shared/src/eventbus/EventBus.ts
+import { EventBus, GameEvent } from '@farm-game/shared';
+
 enum GameEvent {
   CoinsChanged = 'coins_changed',
+  DiamondsChanged = 'diamonds_changed',
   InventoryChanged = 'inventory_changed',
   PlotStateChanged = 'plot_state_changed',
   CropHarvested = 'crop_harvested',
   CropWithered = 'crop_withered',
   SceneChanged = 'scene_changed',
+  ToastShow = 'toast_show',
+  // Phase 2 服务端推送事件
+  ServerConnected = 'server_connected',
+  ServerDisconnected = 'server_disconnected',
+  ServerPlotUpdated = 'server_plot_updated',
+  ServerCropStolen = 'server_crop_stolen',
+  AuthLoggedIn = 'auth_logged_in',
 }
 ```
 
@@ -130,26 +152,14 @@ UI 只订阅事件，不直接调系统。系统改变状态后发事件，UI �
 
 ## 六、时间管理（TimeManager）
 
+**单一事实源在 `packages/shared/src/time/TimeManager.ts`**。纯 TS、无 Cocos 依赖。
+
 ```typescript
-// scripts/core/TimeManager.ts
-class TimeManager {
-  private serverTimeOffset = 0;  // Phase 2 接服务端校时
+import { TimeManager } from '@farm-game/shared';
 
-  now(): number {
-    return Date.now() + this.serverTimeOffset;
-  }
-
-  // 计算作物当前阶段
-  getCropStage(plantedAt: number, duration: number, stages: number): number {
-    const elapsed = (this.now() - plantedAt) / 1000;
-    const progress = Math.min(elapsed / duration, 1);
-    return Math.min(Math.floor(progress * stages), stages - 1);
-  }
-
-  isReady(plantedAt: number, duration: number): boolean {
-    return this.now() - plantedAt >= duration * 1000;
-  }
-}
+const tm = new TimeManager();
+tm.syncServerTime(serverEpochMs);  // Phase 2 登录后调用
+const now = tm.now();
 ```
 
 **单例**，所有"现在几点"都走这个。Phase 2 接服务端校时后，自动防本地改时间。

@@ -50,3 +50,32 @@ design-preview/__pycache__/
 # 环境
 .env
 .env.local
+
+# Monorepo / 各 package 构建产物
+node_modules/
+dist/
+*.tsbuildinfo
+packages/*/dist
+packages/*/build
+packages/*/.tsbuild
+coverage/
+tmp/
+
+# React Native / Expo
+.expo/
+.expo-shared/
+
+# iOS / Android native shells
+ios/Pods/
+ios/build/
+android/.gradle/
+android/build/
+android/app/build/
+*.ipa
+*.apk
+*.aab
+*.app/
+
+# Drizzle / MikroORM migrations cache（保留源文件，忽略运行产物）
+.mikro-orm-cache/
+.drizzle/

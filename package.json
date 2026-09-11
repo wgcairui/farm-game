@@ -1,0 +1,24 @@
+{
+  "name": "farm-game",
+  "private": true,
+  "version": "0.0.0",
+  "description": "QQ-Farm-like 2D social sim. pnpm monorepo with Cocos mini-program + React Native app clients sharing a global Fastify/Colyseus/Postgres/Redis backend.",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=./packages/* build",
+    "test": "pnpm -r --filter=./packages/* test",
+    "smoke": "pnpm -r build && node --import tsx scripts/smoke-protocol.ts",
+    "seed-admin": "node --import tsx scripts/seed-admin.ts",
+    "dev:server": "pnpm --filter @farm-game/server dev",
+    "lint:tsc": "tsc -b packages/shared packages/server packages/client-mini packages/client-app"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "tsx": "^4.19.2",
+    "@types/node": "^20.14.10"
+  }
+}
