@@ -2,23 +2,26 @@
  * /crop/configs — open (no auth) endpoint returning the crop catalog from shared.
  */
 
-import { listCrops, type ApiResponse, type CropConfig, PROTOCOL_VERSION } from '@farm-game/shared';
+import type { FastifyInstance } from 'fastify';
+import {
+  listCrops,
+  PROTOCOL_VERSION,
+  type ApiResponse,
+  type CropConfig,
+} from '@farm-game/shared';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type App = any;
-
-export async function cropRoutes(app: App): Promise<void> {
-  app.get('/crop/configs', async (): Promise<ApiResponse<{ crops: CropConfig[]; version: number }>> => {
-    return {
+export async function cropRoutes(app: FastifyInstance): Promise<void> {
+  app.get<{ Reply: ApiResponse<{ crops: CropConfig[]; version: number }> }>(
+    '/crop/configs',
+    async (): Promise<ApiResponse<{ crops: CropConfig[]; version: number }>> => ({
       ok: true,
-      data: {
-        crops: listCrops(),
-        version: 1,
-      },
-    };
-  });
+      data: { crops: listCrops(), version: 1 },
+    }),
+  );
 
-  // The protocol version is repeated here so clients can ping one endpoint
-  // for both data and protocol version without an extra /auth/_meta round-trip.
-  app.get('/crop/_meta', async () => ({ ok: true, data: { protocolVersion: PROTOCOL_VERSION } }));
+  // Single-endpoint for clients that need the protocol version without a separate round-trip.
+  app.get<{ Reply: ApiResponse<{ protocolVersion: string }> }>(
+    '/crop/_meta',
+    async () => ({ ok: true, data: { protocolVersion: PROTOCOL_VERSION } }),
+  );
 }

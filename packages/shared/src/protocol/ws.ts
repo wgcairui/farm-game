@@ -18,7 +18,14 @@ export interface WsEnvelope<TName extends string, TPayload> {
 }
 
 // ── Client → Server ──
-export type ClientHello = WsEnvelope<'hello', { openid: string; token: string; }>;
+/**
+ * Handshake. The client identifies itself by its internal `playerId` (the JWT `sub`),
+ * not by a provider subject — the server has already verified the identity at login.
+ * Sending the JWT `token` again is redundant once the WS upgrade has carried the
+ * `Authorization` header, but kept here so future room-based auth can validate the
+ * token against Colyseus `onAuth`.
+ */
+export type ClientHello = WsEnvelope<'hello', { playerId: string; token: string; }>;
 export type ClientPlant = WsEnvelope<'plant', { plotIndex: number; cropId: string; }>;
 export type ClientWater = WsEnvelope<'water', { plotIndex: number; }>;
 export type ClientHarvest = WsEnvelope<'harvest', { plotIndex: number; }>;
@@ -30,7 +37,7 @@ export type ClientMessage = ClientHello | ClientPlant | ClientWater | ClientHarv
 export type ServerWelcome = WsEnvelope<'welcome', { serverNow: number; roomId: string; }>;
 export type ServerPlotUpdated = WsEnvelope<'plot_updated', { plot: PlotState }>;
 export type ServerCropStolen = WsEnvelope<'crop_stolen', {
-  victimOpenid: string;
+  victimPlayerId: string;
   plotIndex: number;
   cropId: string;
   lostAmount: number;

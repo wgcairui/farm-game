@@ -44,7 +44,7 @@ export class HeadlessGameApp {
 
   constructor(cfg: HeadlessConfig = {}) {
     this._storage = cfg.storage ?? new MemoryStorageAdapter();
-    this._save = cfg.save ?? createDefaultPlayerSave('local-headless');
+    this._save = cfg.save ?? createDefaultPlayerSave({ playerId: 'local-headless' });
   }
 
   /** Mirrors GameApp.onLoad() wiring. */
@@ -59,7 +59,7 @@ export class HeadlessGameApp {
     this.farm.recalcOnLogin();
     this._ticker = setInterval(() => this.farm.tick(), 1000);
     this._flusher = setInterval(() => this.flush(), 5000);
-    EventBus.emit(GameEvent.AuthLoggedIn, { openid: this._save.openid });
+    EventBus.emit(GameEvent.AuthLoggedIn, { playerId: this._save.playerId });
   }
 
   /** Mirrors GameApp.onDestroy(). */

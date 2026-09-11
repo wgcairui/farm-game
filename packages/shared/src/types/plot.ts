@@ -3,7 +3,7 @@
  * Plot is a single farm tile; the home page exposes a 4×6 = 24 tile grid in v25 baseline.
  */
 
-export type PlotId = string; // stable id; Phase 1 may use "player:openid:0"
+export type PlotId = string; // stable id; "{playerId}:{index}"
 
 export type PlotStatus = 'empty' | 'growing' | 'ready' | 'withered';
 

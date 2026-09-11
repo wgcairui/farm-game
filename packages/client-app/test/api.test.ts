@@ -25,7 +25,11 @@ test('ApiClient.loginWeChat posts JSON body and returns parsed shape', async () 
   const fetchStub: typeof fetch = async () =>
     new Response(JSON.stringify({
       ok: true,
-      data: { token: 'jwt', player: { openid: 'x' } as PlayerSave, auth: { openid: 'x', platform: Platform.WeChatMini, issuedAt: 0, expiresAt: 0 } },
+      data: {
+        token: 'jwt',
+        player: { playerId: 'p-1' } as PlayerSave,
+        auth: { playerId: 'p-1', identities: [], issuedAt: 0, expiresAt: 0 },
+      },
     }), { status: 200 });
   const client = new ApiClient({ baseUrl: 'http://example.test', platform: Platform.WeChatMini, fetchImpl: fetchStub });
   const r = await client.loginWeChat({ code: 'abc' });
@@ -38,7 +42,7 @@ test('ApiClient.getPlayerInfo attaches bearer when token is set', async () => {
   let captured: { init?: RequestInit } | null = null;
   const fetchStub: typeof fetch = async (_url, init) => {
     captured = { init };
-    return new Response(JSON.stringify({ ok: true, data: { openid: 'x' } }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, data: { playerId: 'x' } }), { status: 200 });
   };
   const client = new ApiClient({ baseUrl: 'http://example.test', platform: Platform.Android, fetchImpl: fetchStub });
   client.setToken('token-xyz');

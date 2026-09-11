@@ -49,19 +49,82 @@ test('computeMatureAt returns undefined for unknown crop', () => {
   assert.equal(computeMatureAt(Date.now(), 'not-a-crop'), undefined);
 });
 
-test('applyWater caps at 50% discount and rejects beyond maxWater', () => {
-  const planted = Date.now();
-  const r1 = applyWater(planted, 'carrot', 0);
-  assert.ok(r1);
-  assert.equal(r1!.waterCount, 1);
-  // 3 waters → max 50% discount → duration = 30s * 0.5
-  const r3 = applyWater(planted, 'carrot', 2);
-  assert.ok(r3);
-  const cfg = getCrop('carrot')!;
-  const expectedDuration = cfg.growthDuration * 1000 * 0.85; // 15% off after 3 waters
-  // (1 - 0.05*3) = 0.85; wither/cap = 0.5
-  assert.equal(r3!.matureAt - planted, expectedDuration);
-  // 4th water rejected
-  const r4 = applyWater(planted, 'carrot', 3);
-  assert.equal(r4, null);
+test('applyWater discounts remaining time, not total duration', () => {
+  const now = Date.now();
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'growing' as const,
+    cropId: 'carrot', plantedAt: now, matureAt: now + 30_000, waterCount: 0,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  // New matureAt = now + ceil(30000 × 0.95) = now + 28500
+  assert.equal(r.value.matureAt, now + 28_500);
+  assert.equal(r.value.waterCount, 1);
+});
+
+test('applyWater compounds: 2nd water discounts new remaining time', () => {
+  const now = Date.now();
+  const firstMatureAt = now + 30_000;
+  const afterFirst = { matureAt: now + 28_500, waterCount: 1 };
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'growing' as const,
+    cropId: 'carrot', plantedAt: now, matureAt: afterFirst.matureAt, waterCount: afterFirst.waterCount,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  // 2nd water on same `now`: remaining = 28500 → new matureAt = now + ceil(28500 × 0.95) = now + 27075
+  assert.equal(r.value.matureAt, now + 27_075);
+  assert.equal(r.value.waterCount, 2);
+});
+
+test('applyWater rejects limit_reached at maxWater', () => {
+  const now = Date.now();
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'growing' as const,
+    cropId: 'carrot', plantedAt: now, matureAt: now + 30_000, waterCount: 3, // carrot.maxWater
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.reason, 'limit_reached');
+});
+
+test('applyWater rejects already_ripe when matureAt <= now', () => {
+  const now = Date.now();
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'growing' as const,
+    cropId: 'carrot', plantedAt: now - 30_000, matureAt: now - 100, waterCount: 0,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.reason, 'already_ripe');
+});
+
+test('applyWater rejects not_growing for empty / ready / withered plots', () => {
+  const now = Date.now();
+  for (const status of ['empty', 'ready', 'withered'] as const) {
+    const plot = {
+      id: 'p:0', index: 0, unlocked: true, status,
+      cropId: status === 'empty' ? undefined : 'carrot',
+      plantedAt: now, matureAt: now + 30_000, waterCount: 0,
+    };
+    const r = applyWater(plot, now);
+    assert.equal(r.ok, false, `status=${status}`);
+    if (!r.ok) assert.equal(r.reason, 'not_growing');
+  }
+});
+
+test('applyWater rejects unknown_crop', () => {
+  const now = Date.now();
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'growing' as const,
+    cropId: 'not-a-crop', plantedAt: now, matureAt: now + 30_000, waterCount: 0,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.reason, 'unknown_crop');
 });

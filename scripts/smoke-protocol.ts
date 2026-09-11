@@ -33,6 +33,7 @@ async function main(): Promise<number> {
     host: '127.0.0.1',
     jwtSecret: 'smoke-secret',
     enableAdmin: false,
+    enableMockAuth: true,
   });
 
   const app = await buildApp({ config });
@@ -56,11 +57,12 @@ async function main(): Promise<number> {
     });
 
     // 2. /auth/wechat
-    const login = await client.loginWeChat({ code: 'smoke_code_xyz' });
+    const login = await client.loginWeChat({ code: 'mock_smoke_code_xyz' });
     expect('POST /auth/wechat ok', login.ok === true);
     if (!login.ok) throw new Error(login.message);
     const { token, player } = login.data;
-    expect('login.player.openid starts with stub_', player.openid.startsWith('stub_'), player.openid);
+    expect('login.player.playerId is uuid-like', /^[0-9a-f-]{8,}$/i.test(player.playerId), player.playerId);
+    expect('login.player.identities[0].subject matches code', player.identities[0]?.subject === 'mock_smoke_code_xyz');
     client.setToken(token);
 
     // 3. /crop/configs

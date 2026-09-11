@@ -1,34 +1,26 @@
 /**
- * /player routes — GET /player/info returns the authenticated player's save.
+ * /player/info — returns the authenticated player's save.
+ *
+ * Per ADR-0001 §1, the lookup key is the JWT `sub` (= internal playerId),
+ * not a provider subject. Token validity is enforced by the `authenticate`
+ * decorator in app.ts.
  */
 
+import type { FastifyInstance } from 'fastify';
 import { ErrorCode, type ApiResponse, type PlayerSave } from '@farm-game/shared';
-import type { InMemoryPlayerRepo } from '../auth/repo.js';
+import { InMemoryPlayerRepo } from '../auth/repo.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type App = any;
-
-export async function playerRoutes(
-  app: App,
-  deps: { repo: InMemoryPlayerRepo },
-): Promise<void> {
-  app.get('/player/info', async (req: { user?: { openid?: string }; jwtVerify: () => Promise<void> }, reply: { code: (n: number) => unknown }): Promise<ApiResponse<PlayerSave>> => {
-    try {
-      await req.jwtVerify();
-    } catch {
-      reply.code(401);
-      return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'invalid or missing token' };
-    }
-    const openid = (req.user as { openid?: string } | undefined)?.openid;
-    if (!openid) {
-      reply.code(401);
-      return { ok: false, code: ErrorCode.INVALID_TOKEN, message: 'token missing openid' };
-    }
-    const player = await deps.repo.findByOpenid(openid);
-    if (!player) {
-      reply.code(404);
-      return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'player not found' };
-    }
-    return { ok: true, data: player };
-  });
+export async function playerRoutes(app: FastifyInstance, deps: { repo: InMemoryPlayerRepo }): Promise<void> {
+  app.get<{ Reply: ApiResponse<PlayerSave> }>(
+    '/player/info',
+    { preHandler: app.authenticate },
+    async (req): Promise<ApiResponse<PlayerSave>> => {
+      const playerId = req.user.sub;
+      const player = await deps.repo.findByPlayerId(playerId);
+      if (!player) {
+        return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'player not found' };
+      }
+      return { ok: true, data: player };
+    },
+  );
 }

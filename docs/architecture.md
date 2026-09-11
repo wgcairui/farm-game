@@ -1,7 +1,7 @@
 # 架构总览（Architecture Overview）
 
-> 版本：v1 · 2026-09-11
-> 状态：Phase 1 骨架已落地（pnpm monorepo + shared / server / client-mini / client-app + smoke 13/13 通过）
+> 版本：v2 · 2026-09-11
+> 状态：Phase 2 G0 已落地（51 单测 / 14 smoke 全绿，详见 [ADR-0001](./adr/0001-g0-contract-and-security-baseline.md)）
 > 配套文档：[deployment.md](./deployment.md) · [client-protocol.md](./client-protocol.md) · [state-sync.md](./state-sync.md) · [admin-integration.md](./admin-integration.md)
 
 ## 1. 系统定位
@@ -146,27 +146,36 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 
 ## 8. 安全边界
 
-- **JWT**：HS256，业务 secret 与 admin secret 分开；TTL 7 天；iOS/Android 用设备指纹 + refresh token（Phase 2）
-- **WS**：握手携带 JWT，连接即校验 openid 与 platform
+- **JWT**：HS256，业务 secret 与 admin secret 分开；TTL 7 天（`JWT_TTL_SEC`）；`iss=farm-game`、`aud=client`；标准 `sub`/`iat`/`exp` 由 `@fastify/jwt` 校验
+- **协议版本**：`x-protocol-version` header major 不匹配 → HTTP 426 `PROTOCOL_VERSION_MISMATCH`
+- **WS**：握手携带 JWT，连接即校验 `sub`（playerId） 与 platform
 - **Admin**：默认 2568 端口内网访问；Nginx `allow 10.0.0.0/8; deny all;`
 - **支付回调**：HMAC 签名 + nonce 防重放；详见 [deployment.md §4](./deployment.md)
-- **数据隔离**：admin DB 不接触业务表，业务代码不接触 admin ORM；ESLint `no-restricted-imports`（Phase 2 启用）
+- **数据隔离**：admin DB 不接触业务表，业务代码不接触 admin ORM；ESLint `no-restricted-imports`（Phase 3 启用）
+- **生产启动 fail-closed**：默认 secret 在 production 启动时抛 `ConfigError`；`ENABLE_MOCK_AUTH=1` 在 production 启动时抛 `ConfigError`
+- **Mock 隔离**：mock login 仅在 `NODE_ENV ∈ {development, test}` + 显式 `ENABLE_MOCK_AUTH=1` 时启用
 
-## 9. 当前 Phase 1 已落地 vs 计划中
+## 9. 当前 Phase 2 G0 已落地 vs 计划中
 
-| 能力 | Phase 1 状态 |
+| 能力 | 状态 |
 |---|---|
 | pnpm monorepo（shared / server / client-mini / client-app） | ✅ 已 build |
-| `@farm-game/shared` 协议契约（HTTP/WS/Auth/ErrorCode） | ✅ 15 单测全绿 |
-| Fastify HTTP（/auth/wechat, /auth/oauth, /crop/configs, /player/info, /farm/unlock, /healthz） | ✅ 7 单测 + 13 smoke 全绿 |
+| `@farm-game/shared` 协议契约（HTTP/WS/Auth/ErrorCode/AuthIdentity） | ✅ 21 单测全绿 |
+| Fastify HTTP（/auth/wechat, /auth/oauth, /auth/bind, /crop/configs, /player/info, /farm/unlock, /healthz） | ✅ 18 单测 + 14 smoke 全绿 |
+| 真实 Fastify 类型 + JSON Schema 校验 | ✅ routes 完全类型化，`any` 仅在 logger 边界一处 |
+| 标准 JWT `sub`/`iat`/`exp` + `iss`/`aud` | ✅ `app.jwt.sign/verify` 配置注入 |
+| 协议版本 426 校验 | ✅ `onRequest` hook + `x-protocol-version` |
+| Mock auth 隔离 + production fail-closed | ✅ `ConfigError` 抛错 |
+| `PlayerRepo.findByIdentity`（provider+subject）替代 `findByOpenid` | ✅ G0 完成；G1 接 MikroORM |
+| `applyWater` 折扣作用于"剩余时间" | ✅ 5 个新单测覆盖 |
+| 新错误码（TOKEN_EXPIRED, WATER_LIMIT_REACHED, OAUTH_*, IDENTITY_ALREADY_BOUND） | ✅ |
 | `@colyseus/admin` 隔离子模块（ENABLE_ADMIN=0 默认） | ✅ 占位 + 拒绝策略 |
-| MikroORM 主库配置（无实体） | ✅ 骨架 |
-| Colyseus WS 房间 | ⌛ Phase 2（`packages/server/src/realtime/room.ts` 占位） |
-| 客户端 headless 业务系统（client-mini） | ✅ 5 单测覆盖 buy→harvest→sell 完整循环 |
-| RN 客户端（client-app） API client + GameStore + 类型契约 | ✅ 7 单测，**不引入 react/react-native** |
-| 视觉规范（v25 design-preview） | ⌛ 未触碰；继续走 [visual-repair-plan-v24.md](./visual-repair-plan-v24.md) |
-| Cocos Creator 工程 | ⌛ Phase 4 |
+| MikroORM 主库配置 + 实体 + 迁移 | ⌛ G1（ADR-0001 §6） |
+| Colyseus WS 房间 + 鉴权 + 重连 | ⌛ G2 |
+| 客户端接真实后端 | ⌛ G3 |
+| Cocos Creator 工程 | ⌛ G4 |
 | React Native 工程（expo prebuild） | ⌛ Phase 5 |
+| 视觉规范（v25 design-preview） | ⌛ 继续走 [visual-repair-plan-v24.md](./visual-repair-plan-v24.md) |
 
 ---
 

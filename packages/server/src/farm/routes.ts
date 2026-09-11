@@ -1,55 +1,41 @@
 /**
- * /farm routes — POST /farm/unlock (Phase 1: mock unlock; Phase 2: deduct gold + persist).
+ * /farm/unlock — unlocks a single plot for the authenticated player.
+ *
+ * Phase 1: free unlock; Phase 2: deduct gold (seedTotalCost placeholder,
+ * real config table TBD). Gold deduction lands with G1 once the price table
+ * is in the database.
  */
 
-import {
-  ErrorCode,
-  seedTotalCost,
-  type ApiResponse,
-  type PlotState,
-} from '@farm-game/shared';
-import type { InMemoryPlayerRepo } from '../auth/repo.js';
+import type { FastifyInstance } from 'fastify';
+import { ErrorCode, type ApiResponse, type PlotState } from '@farm-game/shared';
+import { InMemoryPlayerRepo } from '../auth/repo.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type App = any;
+const unlockBodySchema = {
+  type: 'object',
+  required: ['plotIndex'],
+  additionalProperties: false,
+  properties: { plotIndex: { type: 'integer', minimum: 0, maximum: 23 } },
+} as const;
 
-export async function farmRoutes(
-  app: App,
-  deps: { repo: InMemoryPlayerRepo },
-): Promise<void> {
-  app.post('/farm/unlock', async (req: { body?: { plotIndex?: number }; user?: { openid?: string }; jwtVerify: () => Promise<void> }, reply: { code: (n: number) => unknown }): Promise<ApiResponse<{ plot: PlotState }>> => {
-    try {
-      await req.jwtVerify();
-    } catch {
-      reply.code(401);
-      return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'invalid token' };
-    }
-
-    const openid = (req.user as { openid?: string } | undefined)?.openid;
-    const { plotIndex } = req.body ?? ({} as { plotIndex?: number });
-    if (!openid || typeof plotIndex !== 'number') {
-      reply.code(400);
-      return { ok: false, code: ErrorCode.BAD_REQUEST, message: 'plotIndex required' };
-    }
-
-    const player = await deps.repo.findByOpenid(openid);
-    if (!player) {
-      reply.code(404);
-      return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'player not found' };
-    }
-    const plot = player.plots[plotIndex];
-    if (!plot) {
-      reply.code(404);
-      return { ok: false, code: ErrorCode.PLOT_NOT_OWNED, message: 'plot out of range' };
-    }
-    if (plot.unlocked) {
+export async function farmRoutes(app: FastifyInstance, deps: { repo: InMemoryPlayerRepo }): Promise<void> {
+  app.post<{ Body: { plotIndex: number }; Reply: ApiResponse<{ plot: PlotState }> }>(
+    '/farm/unlock',
+    { preHandler: app.authenticate, schema: { body: unlockBodySchema } },
+    async (req): Promise<ApiResponse<{ plot: PlotState }>> => {
+      const player = await deps.repo.findByPlayerId(req.user.sub);
+      if (!player) {
+        return { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'player not found' };
+      }
+      const { plotIndex } = req.body;
+      const plot = player.plots[plotIndex];
+      if (!plot) {
+        return { ok: false, code: ErrorCode.PLOT_NOT_OWNED, message: 'plot out of range' };
+      }
+      if (!plot.unlocked) {
+        plot.unlocked = true;
+        await deps.repo.upsert(player);
+      }
       return { ok: true, data: { plot } };
-    }
-    // Phase 1: free unlock. Phase 2: deduct gold (seedTotalCost placeholder,
-    // real config table TBD).
-    plot.unlocked = true;
-    player.gold -= 0;
-    await deps.repo.upsert(player);
-    return { ok: true, data: { plot } };
-  });
+    },
+  );
 }

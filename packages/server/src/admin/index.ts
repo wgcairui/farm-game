@@ -8,11 +8,11 @@
  *   - The two ORMs share a Postgres cluster but live in different `database` names.
  *
  * Phase 1 status: NO drizzle connection is established. The function below returns
- * a no-op router when ENABLE_ADMIN=0; when ENABLE_ADMIN=1 it throws ConfigError
+ * a no-op router when ENABLE_ADMIN=0; when ENABLE_ADMIN=1 it throws AdminConfigError
  * because Phase 1 deliberately skips the real mount (see plan §7).
  */
 
-import type { FastifyInstance as _Fastify } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
 export interface AdminDeps {
   adminDbUrl: string;
@@ -35,23 +35,17 @@ export class AdminConfigError extends Error {
  *
  * Phase 2: implement Drizzle connection pool, schema migration, and admin({}) mount.
  */
-export async function mountAdmin(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  app: any,
-  deps: AdminDeps,
-  enableAdmin: boolean,
-): Promise<void> {
+export async function mountAdmin(app: FastifyInstance, deps: AdminDeps, enableAdmin: boolean): Promise<void> {
+  // Reference `deps` to keep the parameter list stable for callers/tests even
+  // though the Phase-1 implementation does not use them.
+  void deps;
+
   if (!enableAdmin) {
     app.get('/admin/healthz', async () => ({ ok: true, enabled: false }));
-    app.get('/admin', async (_req: unknown, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) =>
-      reply.code(404).send({ ok: false }),
-    );
+    app.get('/admin', async (_req, reply) => reply.code(404).send({ ok: false }));
     return;
   }
 
-  // Phase 2 will:
-  //   const db = await connectDrizzle(deps.adminDbUrl);
-  //   await app.register(admin({ database: db, jwtSecret: deps.jwtSecretAdmin, sessionSecret: deps.sessionSecret }));
   throw new AdminConfigError(
     'ENABLE_ADMIN=1 but admin sub-module is Phase 2. ' +
     'See docs/admin-integration.md for the planned implementation and migration order.',

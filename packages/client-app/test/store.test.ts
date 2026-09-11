@@ -7,26 +7,26 @@ test('GameStore notifies subscribers on setPlayer', () => {
   const store = new GameStore();
   const calls: number[] = [];
   store.subscribe(() => calls.push(1));
-  store.setPlayer(createDefaultPlayerSave('openid-1'));
+  store.setPlayer(createDefaultPlayerSave({ playerId: 'player-1' }));
   assert.equal(calls.length, 1);
   store.destroy();
 });
 
 test('GameStore.setConnected toggles flag without changing player', () => {
   const store = new GameStore();
-  const player = createDefaultPlayerSave('openid-2');
+  const player = createDefaultPlayerSave({ playerId: 'player-2' });
   store.setPlayer(player);
   store.setConnected(true);
   assert.equal(store.state.connected, true);
-  assert.equal(store.state.player?.openid, 'openid-2');
+  assert.equal(store.state.player?.playerId, 'player-2');
   store.destroy();
 });
 
 test('patchPlot updates the matching plot immutably', () => {
-  const player = createDefaultPlayerSave('openid-3');
+  const player = createDefaultPlayerSave({ playerId: 'player-3' });
   const before = { player, connected: false };
   const patch: PlotState = {
-    id: 'openid-3:2', index: 2, unlocked: true, status: 'growing',
+    id: 'player-3:2', index: 2, unlocked: true, status: 'growing',
     cropId: 'carrot', plantedAt: 1, waterCount: 0,
   };
   const after = patchPlot(before, patch);

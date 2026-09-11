@@ -27,10 +27,21 @@ test('isErrorPayload narrows shape', () => {
 });
 
 test('createDefaultPlayerSave generates 24 plots with 8 unlocked', () => {
-  const save = createDefaultPlayerSave('tester');
-  assert.equal(save.openid, 'tester');
+  const save = createDefaultPlayerSave({ playerId: 'tester' });
+  assert.equal(save.playerId, 'tester');
   assert.equal(save.plots.length, 24);
   assert.equal(save.plots.filter((p) => p.unlocked).length, 8);
   assert.equal(save.gold, 200);
   assert.equal(save.version, 1);
+  assert.deepEqual(save.identities, []);
+});
+
+test('createDefaultPlayerSave seeds initial identity when provided', () => {
+  const save = createDefaultPlayerSave({
+    playerId: 'tester',
+    initialIdentity: { provider: 'weChatMini', subject: 'mock_openid', boundAt: 100 },
+  });
+  assert.equal(save.identities.length, 1);
+  assert.equal(save.identities[0]!.provider, 'weChatMini');
+  assert.equal(save.identities[0]!.subject, 'mock_openid');
 });

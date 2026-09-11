@@ -1,6 +1,6 @@
 # 数据表设计
 
-> 更新：2026-09-11 — Phase 1 抽到 `packages/shared`。
+> 更新：v2 · 2026-09-11 — Phase 2 G0：移除 `PlayerSave.openid`，新增 `AuthIdentity`；浇水规则修正（ADR-0001）。
 >
 > 所有类型**单一事实源**在 [`packages/shared/src/types/`](../packages/shared/src/types/)。本文件保留策划视角的设计意图与历史记录；代码以 shared 为准。
 
@@ -13,17 +13,17 @@
 import type { CropConfig } from '@farm-game/shared';
 
 interface CropConfig {
-  id: string;                  // 'carrot' | 'potato' | ...
-  name: string;                // '白萝卜'
-  icon: string;                // 资源 key
-  seedPrice: number;           // 种子价格（金币）
-  sellPrice: number;           // 收获售价
-  growthDuration: number;      // 总生长时长（秒）
-  stages: number;              // 生长阶段数（含种子→成熟）
-  maxWater: number;            // 浇水次数上限
-  witherWindow: number;        // 成熟后多久枯萎（秒）
-  seedItemId: string;          // 背包里的种子 id
-  cropItemId: string;          // 收获后入仓库的作物 id
+  id: string;
+  name: string;
+  icon: string;
+  seedPrice: number;
+  sellPrice: number;
+  growthDuration: number;   // 秒
+  stages: number;
+  maxWater: number;         // 默认 3
+  witherWindow: number;
+  seedItemId: string;
+  cropItemId: string;
 }
 ```
 
@@ -48,46 +48,46 @@ interface CropConfig {
 import type { PlotState } from '@farm-game/shared';
 
 interface PlotState {
-  id: string;                  // 'openid:index'，稳定 id
+  id: string;                  // '{playerId}:{index}'，稳定 id
   index: number;               // 地块索引 0~23（v25 baseline = 4×6 = 24）
-  unlocked: boolean;           // 是否解锁
+  unlocked: boolean;
   status: 'empty' | 'growing' | 'ready' | 'withered';
-  cropId?: string;             // 已种植时填
+  cropId?: string;
   plantedAt?: number;          // 种植时间戳（毫秒）
-  matureAt?: number;           // 成熟时间戳（毫秒）
-  waterCount: number;          // 浇水次数（默认 0）
+  matureAt?: number;           // 成熟时间戳（毫秒）；每次浇水重算
+  waterCount: number;
 }
 ```
 
-**关键设计**：`plantedAt` 用时间戳，不用"剩余时间"。
+**关键设计**：`plantedAt` 和 `matureAt` 都是绝对时间戳，不用"剩余时间"。
 
 理由：
 - 杀进程后再开，时间戳还能算出生长进度
-- 改系统时间作弊时，可结合服务器校验（Phase 2）
+- 改系统时间作弊时，可结合服务器校验（G1+）
 - 离线多久都能正确结算
+- 浇水折扣作用于"剩余时间"，与原始 `matureAt` 兼容
 
 ---
 
 ## 三、玩家存档（PlayerSave）
 
-整个游戏一份，存本地 + 服务端（Phase 2）。
+整个游戏一份，存本地 + 服务端（G1+）。
 
 ```typescript
 // packages/shared/src/types/player.ts
-import type { PlayerSave, InventoryItem, PlayerSettings } from '@farm-game/shared';
+import type { PlayerSave, InventoryItem, PlayerSettings, AuthIdentityRef } from '@farm-game/shared';
 
 interface PlayerSave {
-  version: number;             // 存档版本号，便于迁移
-  playerId: string;            // 本地生成的 uuid（Phase 1 即可，Phase 2 换登录 id）
-  openid: string;              // 服务端认证 id；登录后写入
+  version: number;
+  playerId: string;            // 内部稳定 UUID；服务端签发；跨平台唯一
   nickname?: string;
   avatarUrl?: string;
   createdAt: number;
   updatedAt: number;
 
   // 资源
-  gold: number;                // 金币（命名：gold 取代 coins，与 PRD §5.1 对齐）
-  gems: number;                // 钻石
+  gold: number;
+  gems: number;
 
   // 背包
   inventory: InventoryItem[];
@@ -99,12 +99,41 @@ interface PlayerSave {
   level: number;
   exp: number;
   settings: PlayerSettings;
+
+  // 绑定身份（ADR-0001 §1）
+  identities: AuthIdentityRef[];
 }
 ```
 
-### 字段重命名说明
+### 字段变更说明
 
-Phase 1 起字段统一为 PRD §4.1 命名：`coins` → `gold`、`inventory` 不变、`plots` 不变。新建存档时使用 `createDefaultPlayerSave(openid)` 生成。
+- `coins` → `gold`（与 PRD §4.1 对齐）
+- `openid` 字段已**移除**。`openid` 是 provider 私有身份，不进入客户端公开协议。改用 `identities` 列表承载。
+
+### AuthIdentity 与绑定
+
+```typescript
+// packages/shared/src/types/auth-identity.ts
+type AuthProvider = 'weChatMini' | 'ios' | 'android' | 'h5';
+
+interface AuthIdentity {
+  provider: AuthProvider;
+  subject: string;            // 微信 openid / Apple sub / Google sub
+  tenantId?: string;          // 应用/小程序 appid 范围
+  boundAt: number;
+}
+
+interface AuthIdentityRef {
+  provider: AuthProvider;
+  subject: string;
+  boundAt: number;
+}
+```
+
+- 一个玩家可绑定多个 `AuthIdentity`；典型场景：微信 + Apple 同一账号
+- 绑定必须经 `POST /auth/bind`（Bearer JWT），不接受客户端伪造的身份
+- 重复绑定到不同玩家 → `2003 IDENTITY_ALREADY_BOUND`
+- `PlayerRepo.findByIdentity({ provider, subject, tenantId })` 是登录键；不使用 `playerId` 作为登录键
 
 ---
 
@@ -125,7 +154,6 @@ type ItemId =
 解耦 UI 和业务系统的关键。**单一事实源在 `packages/shared/src/eventbus/EventBus.ts`**，自实现轻量 emit/on/off（替代 Cocos `cc.EventTarget`）。
 
 ```typescript
-// packages/shared/src/eventbus/EventBus.ts
 import { EventBus, GameEvent } from '@farm-game/shared';
 
 enum GameEvent {
@@ -137,7 +165,7 @@ enum GameEvent {
   CropWithered = 'crop_withered',
   SceneChanged = 'scene_changed',
   ToastShow = 'toast_show',
-  // Phase 2 服务端推送事件
+  // 服务端推送事件
   ServerConnected = 'server_connected',
   ServerDisconnected = 'server_disconnected',
   ServerPlotUpdated = 'server_plot_updated',
@@ -158,15 +186,42 @@ UI 只订阅事件，不直接调系统。系统改变状态后发事件，UI �
 import { TimeManager } from '@farm-game/shared';
 
 const tm = new TimeManager();
-tm.syncServerTime(serverEpochMs);  // Phase 2 登录后调用
+tm.syncServerTime(serverEpochMs);  // 登录后调用
 const now = tm.now();
 ```
 
-**单例**，所有"现在几点"都走这个。Phase 2 接服务端校时后，自动防本地改时间。
+**单例**，所有"现在几点"都走这个。接服务端校时后，自动防本地改时间。
 
 ---
 
-## 七、存档版本迁移
+## 七、浇水算法（ADR-0001 §5）
+
+```typescript
+// packages/shared/src/logic/growth.ts
+export const WATER_DISCOUNT_PER = 0.05; // 5% of *remaining* time, per PRD §2.2.3
+
+export function applyWater(plot, now):
+  | { ok: true; value: { matureAt: number; waterCount: number } }
+  | { ok: false; reason: 'unknown_crop' | 'not_growing' | 'already_ripe' | 'limit_reached' }
+{
+  // 1. plot 必须 status='growing' + 有 matureAt + cropId 在 CROPS
+  // 2. plot.waterCount < crop.maxWater
+  // 3. matureAt > now（已成熟则拒）
+  // 4. remaining = matureAt - now
+  // 5. discounted = ceil(remaining * 0.95)
+  // 6. matureAt_new = now + discounted
+  // 7. waterCount_new = waterCount + 1
+}
+```
+
+- 每次浇水对"剩余时间"打 5% 折扣，不是对总时长
+- `maxWater` 默认 3；超过返回 `WATER_LIMIT_REACHED`（错误码 3006）
+- 已成熟的地块不能再浇：返回 `already_ripe`（错误码 3003 `CROP_NOT_RIPE` 复用）
+- 与服务器权威 `now` 一同传入，禁止客户端传入本地时间
+
+---
+
+## 八、存档版本迁移
 
 未来加字段时：
 
@@ -176,7 +231,7 @@ const CURRENT_SAVE_VERSION = 1;
 function migrate(save: any): PlayerSave {
   if (!save.version) save.version = 1;
   if (save.version < 2) {
-    // 加字段
+    save.identities = save.identities ?? [];
     save.settings = defaultSettings();
     save.version = 2;
   }
@@ -185,3 +240,5 @@ function migrate(save: any): PlayerSave {
 ```
 
 每次改 schema 加一档版本号，**永不删除旧版本逻辑**。
+
+v1 → v2 迁移（G0 落地后）：移除 `openid` 字段，新建 `identities: []`。

@@ -1,11 +1,18 @@
 /**
  * Player types — both client SaveManager and server InMemoryPlayerRepo use the same shape.
+ *
+ * Per ADR-0001 §1, `PlayerSave` carries the *internal* playerId (UUID) and a
+ * list of bound `AuthIdentityRef`s. Provider subject strings (WeChat openid,
+ * Apple sub, Google sub) live in `AuthIdentity` records, not on the player
+ * envelope. This split is what lets the same backend serve WeChat, iOS, and
+ * Android without leaking openids between players.
  */
 
 import type { PlotState } from './plot.js';
+import type { AuthIdentityRef } from './auth-identity.js';
 
 export interface InventoryItem {
-  itemId: string;           // 'carrot_seed' | 'carrot' | 'potato_seed' | ...
+  itemId: string;
   count: number;
 }
 
@@ -17,8 +24,8 @@ export interface PlayerSettings {
 
 export interface PlayerSave {
   version: number;
+  /** Internal stable UUID. Server-issued. Cross-platform unique. */
   playerId: string;
-  openid: string;
   nickname?: string;
   avatarUrl?: string;
   gold: number;
@@ -30,20 +37,31 @@ export interface PlayerSave {
   settings: PlayerSettings;
   createdAt: number;
   updatedAt: number;
+  /** Bound provider identities. Empty for a fresh player until first login binds it. */
+  identities: AuthIdentityRef[];
 }
 
-export function createDefaultPlayerSave(openid: string): PlayerSave {
+/**
+ * Construct a fresh PlayerSave. `playerId` is generated server-side via crypto.randomUUID;
+ * the constructor accepts the generated id so the same shape can be built in tests with
+ * deterministic ids.
+ */
+export function createDefaultPlayerSave(args: {
+  playerId: string;
+  initialIdentity?: AuthIdentityRef;
+}): PlayerSave {
+  const { playerId, initialIdentity } = args;
+  const now = Date.now();
   return {
     version: 1,
-    playerId: openid,
-    openid,
+    playerId,
     gold: 200,
     gems: 0,
     inventory: [],
     plots: Array.from({ length: 24 }, (_, i) => ({
-      id: `${openid}:${i}`,
+      id: `${playerId}:${i}`,
       index: i,
-      unlocked: i < 8,           // first 8 unlocked by default; rest to be unlocked
+      unlocked: i < 8,
       status: 'empty' as const,
       waterCount: 0,
     })),
@@ -54,7 +72,8 @@ export function createDefaultPlayerSave(openid: string): PlayerSave {
       sfxVolume: 1.0,
       notificationsEnabled: true,
     },
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    identities: initialIdentity ? [initialIdentity] : [],
+    createdAt: now,
+    updatedAt: now,
   };
 }

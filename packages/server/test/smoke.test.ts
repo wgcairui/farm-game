@@ -10,7 +10,12 @@ let baseUrl: string;
 
 before(async () => {
   process.env.NODE_ENV = 'test';
-  const config = loadConfig({ port: 0, jwtSecret: 'test-secret', enableAdmin: false });
+  const config = loadConfig({
+    port: 0,
+    jwtSecret: 'test-secret',
+    enableAdmin: false,
+    enableMockAuth: true,
+  });
   app = await buildApp({ config });
   await app.listen({ port: 0, host: '127.0.0.1' });
   const addr = app.server.address();
@@ -52,16 +57,21 @@ test('POST /auth/wechat → /player/info → /farm/unlock chain', async () => {
     body: JSON.stringify({ code: 'mock_code_1234567890' }),
   });
   assert.equal(login.status, 200);
-  const loginBody = (await login.json()) as { ok: boolean; data: { token: string; player: { openid: string } } };
+  const loginBody = (await login.json()) as {
+    ok: boolean;
+    data: { token: string; player: { playerId: string; identities: Array<{ provider: string; subject: string }> } };
+  };
   assert.equal(loginBody.ok, true);
   const token = loginBody.data.token;
   assert.ok(token.length > 0);
+  assert.ok(loginBody.data.player.playerId.length > 0);
+  assert.equal(loginBody.data.player.identities[0]?.subject, 'mock_code_1234567890');
 
   const me = await fetch(`${baseUrl}/player/info`, {
     headers: { authorization: `Bearer ${token}` },
   });
   assert.equal(me.status, 200);
-  const meBody = (await me.json()) as { ok: boolean; data: { openid: string; gold: number; plots: unknown[] } };
+  const meBody = (await me.json()) as { ok: boolean; data: { playerId: string; gold: number; plots: unknown[] } };
   assert.equal(meBody.ok, true);
   assert.equal(meBody.data.gold, 200);
   assert.equal(meBody.data.plots.length, 24);
