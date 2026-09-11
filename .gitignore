@@ -27,8 +27,22 @@ native/engine/
 # ZCode 本地工作目录(规划文件、会话记录等)
 .zcode/
 
-# 设计稿(39 MB base64,体积过大不入库)
-design-preview/
+# 设计稿 — 仅 v25 候选 + 关键脚本/报告入库, 历史版本与 38 MB base64 总入口仍排除
+design-preview/*
+!design-preview/gen_v25.py
+!design-preview/validate_hits.py
+!design-preview/render.py
+!design-preview/farm-v25.html
+!design-preview/final-v25.png
+!design-preview/mobile-v25-375.png
+!design-preview/mobile-v25-390.png
+!design-preview/mobile-v25-430.png
+!design-preview/COMPARE-v24-v25.png
+!design-preview/hit-validation.json
+!design-preview/hit-validation.md
+# 排除历史版本 (体积 + 不再迭代)
+design-preview/_assets-*/
+design-preview/__pycache__/
 
 # AI 生成报告中的临时文件
 /tmp/
