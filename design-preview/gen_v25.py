@@ -457,45 +457,6 @@ def layer_ground():
     return "".join(o)
 
 
-def layer_pond():
-    o = ['<g id="L5-pond">']
-    # 岸边泥圈
-    o.append(path("M4,490 C8,468 40,458 76,456 C112,454 146,462 162,478 "
-                  "C178,496 172,516 142,524 C110,533 68,531 42,523 C14,515 0,510 4,490 Z",
-                  fill="#c2a56e", opacity="0.55"))
-    # 水面
-    o.append(path("M8,490 C12,470 40,458 76,456 C112,454 146,462 162,478 "
-                  "C178,496 172,514 142,522 C110,531 68,529 42,521 C14,513 4,508 8,490 Z",
-                  fill="url(#waterGrad)"))
-    o.append(path("M8,490 C12,470 40,458 76,456 C112,454 146,462 162,478 "
-                  "C178,496 172,514 142,522 C110,531 68,529 42,521 C14,513 4,508 8,490 Z",
-                  fill="none", stroke="#cfe9e4", stroke_width="3.2", opacity="0.85"))
-    # 波纹
-    for dx, dy, w2 in [(62, 476, 42), (104, 470, 44), (52, 502, 36), (112, 500, 38), (86, 516, 32)]:
-        o.append(f'<path d="M{f(dx-w2/2)},{f(dy)} q{f(w2/4)},{f(-3.4)} {f(w2/2)},0 '
-                 f'q{f(w2/4)},{f(3.4)} {f(w2/2)},0" fill="none" stroke="#e8fafa" '
-                 f'stroke-width="1.9" opacity="0.6" stroke-linecap="round"/>')
-    # 睡莲叶
-    for x, y, r in [(26, 490, 11), (58, 508, 10), (102, 468, 13), (136, 474, 9),
-                    (16, 514, 8), (80, 518, 11), (126, 508, 8)]:
-        o.append(f'<g transform="translate({x},{y})">'
-                 f'<ellipse rx="{r}" ry="{f(r*0.58)}" fill="#6fb14a"/>'
-                 f'<ellipse rx="{f(r*0.72)}" ry="{f(r*0.40)}" fill="#8ccb5f" '
-                 f'transform="translate(-1,-1.4)"/></g>')
-    # 白莲
-    o.append(f'<g transform="translate(118,466)">'
-             f'<ellipse rx="11" ry="6" fill="#5f9f42"/>'
-             + "".join(f'<ellipse cx="0" cy="-6" rx="4.6" ry="7.4" fill="#ffffff" '
-                       f'transform="rotate({a})"/>' for a in (-40, -14, 14, 40))
-             + f'<circle r="3.2" fill="#f7d94a"/></g>')
-    # 木栈桥
-    o.append(rect(58, 498, 34, 15, rx=3, fill="#cfa768", stroke="#9a6f3c", stroke_width="1.5"))
-    for k in range(3):
-        o.append(rect(60, 500 + k * 4.6, 30, 2.4, fill="#b98d52", opacity="0.8"))
-    o.append("</g>")
-    return "".join(o)
-
-
 def layer_fence(x0, y0, x1, y1, posts, post_h=64, iid="fence"):
     """简易木栅栏: 沿线节点画立柱 + 两道横杆"""
     o = [f'<g id="{iid}">']
@@ -516,14 +477,6 @@ def layer_fence(x0, y0, x1, y1, posts, post_h=64, iid="fence"):
                  f'stroke-width="7.5" stroke-linecap="round"/>')
         o.append(f'<path d="M{f(x0-8)},{f(ay-1.6)} L{f(x1+8)},{f(by-1.6)}" stroke="#e0bb85" '
                  f'stroke-width="3.4" stroke-linecap="round" opacity="0.9"/>')
-    o.append("</g>")
-    return "".join(o)
-
-
-def layer_pondfence():
-    o = ['<g id="L5b-pondfence">']
-    o.append(layer_fence(146, 516, 250, 468, 4, 46, "pfence1"))
-    o.append(layer_fence(-8, 536, 46, 522, 3, 44, "pfence2"))
     o.append("</g>")
     return "".join(o)
 
@@ -619,127 +572,325 @@ def layer_bubble_dog():
 
 
 def layer_cottage():
-    """草屋 (x 424..608, y 392..564).
+    """草屋 (x 424..596, y 392..564).
 
-    V02 改造 (2026-09-11): 建筑改为 2:1 dimetric 立方体盒子 + 双坡顶,
-    与地块共享同一投影方向. 顺序:
+    统一 dimetric 投影: origin O=(438,562), U=(47,24), V=(-47,24).
+    正面墙: 宽152, 侧深22, 墙高92, 檐高78.
+    顺序:
       1. 地面阴影
-      2. 盒子顶面 (dimetric 平行四边形) + 盒子右侧面 (dimetric 平行四边形)
-      3. 盒子正面墙体 (矩形)
-      4. 木框 + 门 + 窗 + 花箱 + 长凳 (保持原坐标)
-      5. 烟囱后段 (V05, 先于屋顶)
-      6. 屋顶双坡 (dimetric 平行四边形) + 山墙 + 茅檐
+      2. 盒子顶面 + 右侧面 (dimetric 平行四边形, 短轴 V 方向)
+      3. 盒子正面墙体 (平行四边形, 墙顶平行于 U)
+      4. 木框 + 门 + 窗 + 花箱 + 长凳
+      5. 烟囱后段 (先于屋顶)
+      6. 屋顶双坡 (dimetric 平行四边形) + 茅檐
       7. 屋面接触泛水 + 炊烟
       8. 右侧栅栏
+
+    V02 修复 (2026-09-11): 前墙体改为平行四边形, 墙顶边平行于 U=(47,24).
+    门/窗使用仿射变换映射到倾斜墙面.
     """
     o = ['<g id="L8-cottage">']
-    # 地面阴影
-    o.append(ell(516, 560, 96, 16, fill="#7d9a42", opacity="0.35"))
+    # ---- dimetric 参数 ----
+    COT_OY = 562  # front-left wall bottom y (ground level)
+    COT_FW = 152   # front width
+    COT_FD = 22    # depth
+    COT_WH = 92    # wall height
+    COT_RH = 78    # roof height above eave
+    U_MAG = math.sqrt(47**2 + 24**2)  # ≈52.8
+    V_MAG = U_MAG
+    # k_u = 152/|U| ≈ 2.88 使 front eave 长度为 152px, 方向平行于 U
+    k_u = COT_FW / U_MAG
+    # k_v = 22/|V| ≈ 0.42 使 right eave 长度为 22px, 方向平行于 V
+    k_v = COT_FD / V_MAG
+    U = (47.0 * k_u, 24.0 * k_u)    # (≈135.4, ≈69.2) 方向平行于 U
+    V = (-47.0 * k_v, 24.0 * k_v)   # (≈-19.7, ≈10.1) 方向平行于 V
 
-    # ---- dimetric 盒子底座 (V02) ----
-    # 盒子正面 (438, 470, 152, 92); dimetric 短轴厚 22px -> 偏移 (22, 11)
-    # 短轴厚度选 22 而非 24 是为了不让右侧面超过 LAYOUT x1=612.
-    # 顶面平行四边形: (438,470) -> (460,481) -> (612,481) -> (590,470)
-    # 右侧平行四边形: (590,470) -> (612,481) -> (612,573) -> (590,562)
-    # 盒子顶面 — 浅米色 (与地块草地对比)
-    o.append(poly([(438, 470), (460, 481), (612, 481), (590, 470)],
+    # 实际顶点 (从 origin O=(438,562) 出发)
+    # Front eave: FEL -> FER, 平行于 U, 长152px
+    COT_FEL = (438.0, 470.0)  # front eave left (on front wall top line)
+    COT_FER = (COT_FEL[0] + U[0], COT_FEL[1] + U[1])  # front eave right (≈573.4, 539.2)
+    # Right eave: FER -> BER, 平行于 V, 长22px
+    COT_BER = (COT_FER[0] + V[0], COT_FER[1] + V[1])  # back eave right (≈553.7, 549.3)
+    # Back eave: BEL -> BER, 平行于 U (方向与 FEL->FER 相同)
+    # 左上角 BEL: front eave left + V
+    COT_BEL = (COT_FEL[0] + V[0], COT_FEL[1] + V[1])  # back eave left (≈418.3, 480.1)
+    # Ridge: 平行于 V, 在 eave 中点上方 COT_RH
+    eave_mid_front = ((COT_FEL[0] + COT_FER[0]) / 2, (COT_FEL[1] + COT_FER[1]) / 2)
+    eave_mid_back = ((COT_BEL[0] + COT_BER[0]) / 2, (COT_BEL[1] + COT_BER[1]) / 2)
+    COT_RF = (eave_mid_front[0], eave_mid_front[1] - COT_RH)   # ridge front (≈505.7, 461.2)
+    COT_RB = (eave_mid_back[0], eave_mid_back[1] - COT_RH)     # ridge back (≈486.0, 471.1)
+    # Wall bottom corners (ground level, under FEL and FER)
+    wall_bl = (COT_FEL[0], COT_OY)  # bottom left (438, 562)
+    wall_br = (COT_FER[0], COT_OY)  # bottom right (≈573.4, 562)
+    # Wall top line: 平行于 U, 从 wall_bl 偏移 wall height
+    # 墙顶左: FEL; 墙顶右: FEL + (U[0], 0) = FER
+    # 实际上墙顶就是 front eave line
+
+    # Ground shadow
+    o.append(ell((COT_FEL[0] + COT_FER[0]) / 2, COT_OY, 76, 14, fill="#7d9a42", opacity="0.35"))
+
+    # ---- box top (dimetric parallelogram) ----
+    o.append(poly([COT_FEL, COT_FER, COT_BER, COT_BEL],
                   fill="#d8b888", stroke="#9a6f3c", stroke_width="1.6"))
-    # 盒子顶面纹理 (dimetric 短轴方向平行木纹)
+    # top wood grain lines (along U direction)
     for k in range(4):
-        x0 = 438 + k * 32
-        x1 = 460 + k * 32
-        o.append(line(x0, 470, x1, 481,
-                      stroke="#a87c48", stroke_width="0.8", opacity="0.45"))
-    # 盒子右侧面 — 暗一档表示侧面阴影
-    o.append(poly([(590, 470), (612, 481), (612, 573), (590, 562)],
+        t = (k + 0.5) / 4.0
+        x0 = COT_FEL[0] + t * (COT_FER[0] - COT_FEL[0])
+        y0 = COT_FEL[1] + t * (COT_FER[1] - COT_FEL[1])
+        x1 = COT_BEL[0] + t * (COT_BER[0] - COT_BEL[0])
+        y1 = COT_BEL[1] + t * (COT_BER[1] - COT_BEL[1])
+        o.append(line(x0, y0, x1, y1, stroke="#a87c48", stroke_width="0.8", opacity="0.45"))
+
+    # ---- right face (dimetric parallelogram, V direction) ----
+    # Right face top: front-right to back-right = V direction
+    o.append(poly([COT_FER, COT_BER,
+                   (COT_BER[0], COT_BER[1] + COT_WH),
+                   (COT_FER[0], COT_FER[1] + COT_WH)],
                   fill="#a07a48", stroke="#7d5330", stroke_width="1.8"))
-    # 盒子右侧面纹理 (水平木板线, dimetric 短轴平行)
-    for yline in (498, 524, 550):
-        o.append(line(590, yline, 612, yline + 11,
+    # right face wood grain (horizontal lines)
+    for k in range(3):
+        y = COT_FEL[1] + 20 + k * 24
+        # Interpolate y position on right face
+        right_y_at_y = COT_FER[1] + (y - COT_FEL[1]) * (COT_BER[1] - COT_FER[1]) / (COT_BEL[1] - COT_FEL[1])
+        o.append(line(COT_FER[0], y, COT_BER[0], right_y_at_y + 11,
                       stroke="#7d5330", stroke_width="0.9", opacity="0.55"))
 
-    # ---- 盒子正面墙体 (现有矩形墙体) ----
-    o.append(rect(438, 470, 152, 92, rx=5, fill="url(#wallGrad)"))
-    o.append(rect(438, 470, 152, 92, rx=5, fill="none", stroke="#b9a184", stroke_width="2"))
-    # 木框
-    o.append(rect(436, 468, 12, 96, fill="#8a5f34"))
-    o.append(rect(578, 468, 12, 96, fill="#8a5f34"))
-    o.append(rect(436, 468, 156, 9, fill="#8a5f34"))
-    o.append(path("M500,470 L500,562", stroke="#8a5f34", stroke_width="9"))
-    # 门
-    o.append(path("M482,562 L482,516 Q482,500 502,500 Q522,500 522,516 L522,562 Z",
+    # ---- front wall (parallelogram, top edge parallel to back eave BEL->BER) ----
+    # FIX: top corners must be COT_BEL/COT_BER (back eave) not COT_FEL/COT_FER.
+    # Original [wall_bl, wall_br, COT_FER, COT_FEL] was a twisted quadrilateral where
+    # top edge FEL->FER slope=0.511 but bottom edge horizontal, left/right edges not parallel.
+    # Corrected parallelogram [wall_bl=(438,562), wall_br=(573.37,562), COT_BER=(553.78,549.13), COT_BEL=(430.53,486.36)]:
+    #   bottom: horizontal at y=562; top: BEL->BER slope=0.511; right edge: slanted; left edge: slanted.
+    wall_pts = [wall_bl, wall_br, COT_BER, COT_BEL]
+    o.append(poly(wall_pts, fill="url(#wallGrad)", stroke="#b9a184", stroke_width="2"))
+
+    # wood frame (vertical left post, vertical right post, horizontal top beam)
+    # Left post: from ground up along left edge (V direction)
+    left_post_bottom = wall_bl
+    left_post_top = COT_FEL
+    # Right post: from ground up along right edge (V direction)
+    right_post_bottom = wall_br
+    right_post_top = COT_FER
+    # For the frame, we draw simplified vertical/horizontal posts
+    o.append(path(f"M{COT_FEL[0]-2},{COT_FEL[1]-2} L{COT_FEL[0]-2},{COT_OY+2}",
+                  stroke="#8a5f34", stroke_width="12", fill="none"))
+    o.append(path(f"M{COT_FER[0]-6},{COT_FER[1]-2} L{COT_FER[0]-6},{COT_OY+2}",
+                  stroke="#8a5f34", stroke_width="12", fill="none"))
+    o.append(path(f"M{COT_FEL[0]-2},{COT_FEL[1]-4} L{COT_FER[0]-6},{COT_FER[1]-4}",
+                  stroke="#8a5f34", stroke_width="10", fill="none"))
+    # Center post (vertical, screen-aligned since it's structural)
+    center_x = (COT_FEL[0] + COT_FER[0]) / 2
+    o.append(path(f"M{center_x},{COT_FEL[1]} L{center_x},{COT_OY}",
+                  stroke="#8a5f34", stroke_width="9", fill="none"))
+
+    # ---- door (affine transform onto slanted wall) ----
+    # Door base width=40, height=46. Door bottom at ground level.
+    # Door is parallelogram on wall: bottom follows wall bottom (horizontal),
+    # top follows wall top (parallel to U).
+    door_w = 40
+    door_h = 46
+    door_cx = (COT_FEL[0] + COT_FER[0]) / 2  # door center x at wall base level
+    door_bl_x = door_cx - door_w / 2
+    # Door bottom left: at ground level, left of center
+    door_bl = (door_bl_x, COT_OY)
+    # Door bottom right: at ground level, right of center
+    door_br = (door_bl_x + door_w, COT_OY)
+    # Door top left: on wall top line, same x as door_bl
+    # Wall top line: from COT_FEL to COT_FER, parallel to U
+    # At door_bl_x, find y on wall top line
+    # Wall top line parametric: P = COT_FEL + t * U, solve for t where P.x = door_bl_x
+    t_door = (door_bl_x - COT_FEL[0]) / U[0] if U[0] != 0 else 0
+    door_tl = (door_bl_x, COT_FEL[1] + t_door * U[1])
+    # Door top right
+    door_tr = (door_bl_x + door_w, COT_FEL[1] + t_door * U[1])
+    # Draw door as parallelogram
+    o.append(path(f"M{door_bl[0]:.1f},{door_bl[1]:.1f} "
+                  f"L{door_br[0]:.1f},{door_br[1]:.1f} "
+                  f"L{door_tr[0]:.1f},{door_tr[1]:.1f} "
+                  f"L{door_tl[0]:.1f},{door_tl[1]:.1f} Z",
                   fill="url(#doorGrad)", stroke="#7d5330", stroke_width="2.4"))
-    o.append(rect(486, 520, 32, 42, rx=3, fill="#a8763f", opacity="0.55"))
-    o.append(circ(514, 540, 2.8, fill="#f0d47e"))
-    o.append(text(502, 530, "福", 17, "#c0392b", weight="800"))
-    # 左窗
-    o.append(rect(446, 502, 32, 30, rx=4, fill="#bfe0e8", stroke="#8a5f34", stroke_width="3"))
-    o.append(path("M462,502 L462,532 M446,517 L478,517", stroke="#8a5f34", stroke_width="2.4"))
-    # 右窗
-    o.append(rect(538, 520, 34, 30, rx=4, fill="#bfe0e8", stroke="#8a5f34", stroke_width="3"))
-    o.append(path("M555,520 L555,550 M538,535 L572,535", stroke="#8a5f34", stroke_width="2.4"))
-    # 花箱
-    for bx in (446, 538):
-        o.append(rect(bx, 532 if bx == 446 else 550, 34, 11, rx=2,
+    # Door inner panel (parallelogram)
+    inner_offset = 4
+    inner_bl = (door_bl[0] + inner_offset, door_bl[1] - inner_offset)
+    inner_br = (door_br[0] - inner_offset, door_br[1] - inner_offset)
+    inner_tl = (door_tl[0] + inner_offset, door_tl[1] + inner_offset)
+    inner_tr = (door_tr[0] - inner_offset, door_tr[1] + inner_offset)
+    o.append(path(f"M{inner_bl[0]:.1f},{inner_bl[1]:.1f} "
+                  f"L{inner_br[0]:.1f},{inner_br[1]:.1f} "
+                  f"L{inner_tr[0]:.1f},{inner_tr[1]:.1f} "
+                  f"L{inner_tl[0]:.1f},{inner_tl[1]:.1f} Z",
+                  fill="#a8763f", opacity="0.55"))
+    # Door knob
+    knob_x = door_br[0] - 6
+    knob_y = (door_bl[1] + door_tl[1]) / 2
+    o.append(circ(knob_x, knob_y, 2.8, fill="#f0d47e"))
+    # 福字 (on door, position interpolated)
+    text_x = (door_bl[0] + door_br[0]) / 2
+    text_y = (door_bl[1] + door_tl[1]) / 2 + 8
+    o.append(text(text_x, text_y, "福", 17, "#c0392b", weight="800"))
+
+    # ---- windows (affine transform onto slanted wall) ----
+    # Window 1: left side, width=32, height=30
+    win1_w = 32
+    win1_h = 30
+    win1_cx = COT_FEL[0] + (COT_FER[0] - COT_FEL[0]) * 0.2  # 20% from left
+    win1_y_bottom = COT_FEL[1] + (COT_FER[1] - COT_FEL[1]) * 0.2 + 32  # on wall, lower
+    win1_bl = (win1_cx - win1_w/2, win1_y_bottom)
+    win1_br = (win1_cx + win1_w/2, win1_y_bottom)
+    t_win1 = (win1_bl[0] - COT_FEL[0]) / U[0] if U[0] != 0 else 0
+    win1_tl = (win1_bl[0], COT_FEL[1] + t_win1 * U[1])
+    win1_tr = (win1_br[0], COT_FEL[1] + t_win1 * U[1])
+    o.append(path(f"M{win1_bl[0]:.1f},{win1_bl[1]:.1f} "
+                  f"L{win1_br[0]:.1f},{win1_br[1]:.1f} "
+                  f"L{win1_tr[0]:.1f},{win1_tr[1]:.1f} "
+                  f"L{win1_tl[0]:.1f},{win1_tl[1]:.1f} Z",
+                  fill="#bfe0e8", stroke="#8a5f34", stroke_width="3"))
+    # Window cross (vertical and horizontal bars)
+    o.append(path(f"M{win1_cx:.1f},{win1_bl[1]:.1f} L{win1_cx:.1f},{win1_tl[1]:.1f}",
+                  stroke="#8a5f34", stroke_width="2.4"))
+    win1_mid_y = (win1_bl[1] + win1_tl[1]) / 2
+    o.append(path(f"M{win1_bl[0]:.1f},{win1_mid_y:.1f} L{win1_br[0]:.1f},{win1_mid_y:.1f}",
+                  stroke="#8a5f34", stroke_width="2.4"))
+
+    # Window 2: right side
+    win2_cx = COT_FEL[0] + (COT_FER[0] - COT_FEL[0]) * 0.75  # 75% from left
+    win2_y_bottom = COT_FEL[1] + (COT_FER[1] - COT_FEL[1]) * 0.75 + 48
+    win2_bl = (win2_cx - win1_w/2, win2_y_bottom)
+    win2_br = (win2_cx + win1_w/2, win2_y_bottom)
+    t_win2 = (win2_bl[0] - COT_FEL[0]) / U[0] if U[0] != 0 else 0
+    win2_tl = (win2_bl[0], COT_FEL[1] + t_win2 * U[1])
+    win2_tr = (win2_br[0], COT_FEL[1] + t_win2 * U[1])
+    o.append(path(f"M{win2_bl[0]:.1f},{win2_bl[1]:.1f} "
+                  f"L{win2_br[0]:.1f},{win2_br[1]:.1f} "
+                  f"L{win2_tr[0]:.1f},{win2_tr[1]:.1f} "
+                  f"L{win2_tl[0]:.1f},{win2_tl[1]:.1f} Z",
+                  fill="#bfe0e8", stroke="#8a5f34", stroke_width="3"))
+    o.append(path(f"M{win2_cx:.1f},{win2_bl[1]:.1f} L{win2_cx:.1f},{win2_tl[1]:.1f}",
+                  stroke="#8a5f34", stroke_width="2.4"))
+    win2_mid_y = (win2_bl[1] + win2_tl[1]) / 2
+    o.append(path(f"M{win2_bl[0]:.1f},{win2_mid_y:.1f} L{win2_br[0]:.1f},{win2_mid_y:.1f}",
+                  stroke="#8a5f34", stroke_width="2.4"))
+
+    # flower boxes (simplified, on wall bottom)
+    for bx, by_frac in [(COT_FEL[0] + 10, 0.15), (COT_FER[0] - 50, 0.7)]:
+        # Flower box parallelogram on wall
+        fb_w = 34
+        fb_h = 11
+        fb_bl = (bx, COT_OY - fb_h - 8)
+        fb_br = (bx + fb_w, COT_OY - fb_h - 8)
+        t_fb = (fb_bl[0] - COT_FEL[0]) / U[0] if U[0] != 0 else 0
+        fb_tl = (bx, COT_FEL[1] + t_fb * U[1] - 8)
+        fb_tr = (bx + fb_w, COT_FEL[1] + t_fb * U[1] - 8)
+        o.append(path(f"M{fb_bl[0]:.1f},{fb_bl[1]:.1f} "
+                      f"L{fb_br[0]:.1f},{fb_br[1]:.1f} "
+                      f"L{fb_tr[0]:.1f},{fb_tr[1]:.1f} "
+                      f"L{fb_tl[0]:.1f},{fb_tl[1]:.1f} Z",
                       fill="#a8763f", stroke="#7d5330", stroke_width="1.6"))
         for k in range(4):
             fx = bx + 5 + k * 8
-            fy = (532 if bx == 446 else 550) + 1
+            fy = fb_bl[1] + 1
             o.append(circ(fx, fy, 4.4, fill=["#e8556d", "#f08fa0", "#e8556d", "#f5b942"][k]))
             o.append(circ(fx, fy, 1.6, fill="#ffe08a"))
-    # 长凳
-    o.append(rect(432, 544, 40, 7, rx=2, fill="#b98a52", stroke="#83582c", stroke_width="1.6"))
-    o.append(rect(436, 551, 6, 10, fill="#9c6f3c"))
-    o.append(rect(462, 551, 6, 10, fill="#9c6f3c"))
 
-    # ---- 烟囱后段 (V05) ----
-    # 屋脊曲线在 x=540 附近 y≈430, 烟囱从屋脊穿透处往上 70px 露出.
-    o.append(chimney_back(cx_top=540, base_y=460, shaft_w=46, shaft_h=70,
+    # bench (simplified, at wall base)
+    bench_y = COT_OY - 18
+    o.append(rect(COT_FEL[0] - 6, bench_y, 40, 7, rx=2, fill="#b98a52", stroke="#83582c", stroke_width="1.6"))
+    o.append(rect(COT_FEL[0] - 2, bench_y + 7, 6, 10, fill="#9c6f3c"))
+    o.append(rect(COT_FEL[0] + 26, bench_y + 7, 6, 10, fill="#9c6f3c"))
+
+    # ---- chimney back (before roof so roof covers bottom edge) ----
+    # Chimney based on actual roof vertices: find roof surface y at chimney x
+    # Chimney x centered at ~540, within the near-face roof area
+    chim_x = 540
+    # Roof near-face: line from FEL to RF (left slope) and FER to RF (right slope)
+    # For x=540, it's on the right slope (between RF and FER)
+    # Right slope: param t where x = RF.x + t*(FER.x - RF.x)
+    t_chim = (chim_x - COT_RF[0]) / (COT_FER[0] - COT_RF[0]) if (COT_FER[0] - COT_RF[0]) != 0 else 0
+    roof_y_at_chim = COT_RF[1] + t_chim * (COT_FER[1] - COT_RF[1])
+    chim_base_y = roof_y_at_chim
+    # Shaft height extends above roof
+    o.append(chimney_back(cx_top=chim_x, base_y=chim_base_y, shaft_w=46, shaft_h=70,
                           iid="L8c-chimney-back"))
 
-    # ---- dimetric 双坡顶 (V02) ----
-    # 屋脊顶 (516, 392) 是前坡屋脊; dimetric 后偏移 14,7 -> 后坡屋脊 (530, 399).
-    # 前坡平行四边形: (438,470)→(516,392)→(590,470)→(452,477)→闭合
-    # 后坡平行四边形: (452,477)→(530,399)→(604,477)→闭合
-    # 山墙三角: (438,470)→(516,392)→(590,470)→闭合 (现成茅草 path 已覆盖)
-    # 茅草屋顶 (近侧, 山墙 + 前坡)
-    o.append(path("M424,486 C438,462 452,440 516,392 C580,440 596,464 610,488 "
-                  "C584,482 560,478 516,478 C472,478 448,480 424,486 Z",
+    # ---- roof near face (dimetric parallelogram) ----
+    # FIX: roof_left must use COT_BEL (back eave) not COT_FEL + hardcoded offset.
+    # The left eave should start from the back eave BEL shifted left by overhang.
+    # For a proper parallelogram, 4th point = roof_left + V (same delta as FER-BER).
+    # Overhang: 14px left (back eave), 20px right (front eave)
+    left_overhang = 14
+    right_overhang = 20
+    roof_left = (COT_BEL[0] - left_overhang, COT_BEL[1] + 16)
+    roof_right = (COT_FER[0] + right_overhang, COT_FER[1])
+    # 4th point: parallelogram completion = roof_left + (COT_BER - COT_FER) = roof_left + V
+    _fourth = (roof_left[0] + V[0], roof_left[1] + V[1])
+    o.append(poly([roof_left, COT_RF, roof_right, _fourth],
                   fill="url(#roofGrad)", stroke="#b8913c", stroke_width="0"))
-    # 茅草纹路
+
+    # Straw texture lines (along V direction, from eave to ridge)
     o.append('<g opacity="0.55" stroke="#a87f28" stroke-width="1.5" fill="none">')
     rnd = random.Random(5)
-    for k in range(30):
-        p = k / 29.0
-        x = 430 + p * 174
-        y = 486 - math.sin(p * math.pi) * 0 - abs(p - 0.5) * -34
-        yy = 484 - (1 - abs(p - 0.5) * 2) * 84
-        o.append(f'<path d="M{f(x)},{f(484 - (1-abs(p-0.5)*2)*4)} L{f(516 + (p-0.5)*150)},{f(yy)}"/>')
+    for k in range(22):
+        t = (k + 0.5) / 22.0
+        # Left half (FEL to RF)
+        lx = COT_FEL[0] + t * (COT_RF[0] - COT_FEL[0])
+        ly = COT_FEL[1] + t * (COT_RF[1] - COT_FEL[1])
+        lbx = COT_BEL[0] + t * (COT_RB[0] - COT_BEL[0])
+        lby = COT_BEL[1] + t * (COT_RB[1] - COT_BEL[1])
+        o.append(f'<path d="M{lx:.1f},{ly:.1f} L{lbx:.1f},{lby:.1f}"/>')
+        # Right half (FER to RF)
+        rx = COT_FER[0] + t * (COT_RF[0] - COT_FER[0])
+        ry = COT_FER[1] + t * (COT_RF[1] - COT_FER[1])
+        rrx = COT_BER[0] + t * (COT_RB[0] - COT_BER[0])
+        rry = COT_BER[1] + t * (COT_RB[1] - COT_BER[1])
+        o.append(f'<path d="M{rx:.1f},{ry:.1f} L{rrx:.1f},{rry:.1f}"/>')
     o.append("</g>")
-    o.append(path("M424,486 C438,462 452,440 516,392 C580,440 596,464 610,488 "
-                  "C584,482 560,478 516,478 C472,478 448,480 424,486 Z",
+    # Roof near-face outline stroke
+    o.append(poly([roof_left, COT_RF, roof_right, (COT_FEL[0] - left_overhang + 6, COT_FEL[1] + 18)],
                   fill="none", stroke="#c99a3f", stroke_width="2.4"))
-    # ---- 后坡 (dimetric 平行四边形, V02) ----
-    # 后屋脊顶: 前屋脊顶 (516, 392) dimetric 偏移 (22, 11) -> (538, 403)
-    # 后坡 = (516, 392) → (538, 403) → (612, 481) → (590, 470) → 闭合
-    o.append(poly([(516, 392), (538, 403), (612, 481), (590, 470)],
-                  fill="#c89c4c", stroke="#7d5a30", stroke_width="1.6", opacity="0.94"))
-    # 屋脊高光 (前坡)
-    o.append(path("M516,392 C552,420 574,442 590,462 C566,444 544,428 516,414 Z",
+
+    # ---- roof right face (dimetric parallelogram: RF to RB to BER to FER) ----
+    o.append(poly([COT_RF, COT_RB, COT_BER, COT_FER],
+                  fill="#c89c4c", stroke="#7d5330", stroke_width="1.6", opacity="0.94"))
+
+    # ---- roof ridge highlight ----
+    o.append(path(f"M{COT_RF[0]:.1f},{COT_RF[1]:.1f} "
+                  f"C{COT_RF[0]+36:.1f},{COT_RF[1]+28:.1f} "
+                  f"{COT_FER[0]-20:.1f},{COT_FER[1]-8:.1f} "
+                  f"{COT_FER[0]:.1f},{COT_FER[1]:.1f}",
                   fill="#f6e0a0", opacity="0.75"))
-    o.append(path("M516,392 C484,420 462,440 444,460 C468,442 490,428 516,414 Z",
+    o.append(path(f"M{COT_RF[0]:.1f},{COT_RF[1]:.1f} "
+                  f"C{COT_RF[0]-32:.1f},{COT_RF[1]+28:.1f} "
+                  f"{COT_FEL[0]+20:.1f},{COT_FEL[1]-8:.1f} "
+                  f"{COT_FEL[0]:.1f},{COT_FEL[1]:.1f}",
                   fill="#f6e0a0", opacity="0.45"))
-    # 茅檐厚度
-    o.append(path("M424,486 C450,480 478,477 516,477 C554,477 586,481 610,488 "
-                  "L608,496 C584,489 554,485 516,485 C478,485 450,488 426,494 Z",
+
+    # ---- roof eave thickness ----
+    o.append(poly([(COT_FEL[0] - left_overhang, COT_FEL[1] + 18),
+                   (COT_RF[0], COT_RF[1] + 2),
+                   (COT_FER[0] + right_overhang, COT_FER[1] + 2),
+                   (COT_FEL[0] - left_overhang + 6, COT_FEL[1] + 20)],
                   fill="#c99a3f"))
-    # 屋面接触泛水 (V05)
-    o.append(chimney_contact(cx_top=540, base_y=425, shaft_w=46,
-                             iid="L8c-chimney-contact"))
-    # 炊烟 (V05)
-    o.append(chimney_smoke(cx_top=540, base_y=460, shaft_w=46, shaft_h=70,
+
+    # ---- chimney contact strip (clipped to near eave polygon) ----
+    # Recalculate roof surface at chimney position
+    t_cs = (chim_x - COT_RF[0]) / (COT_FER[0] - COT_RF[0]) if (COT_FER[0] - COT_RF[0]) != 0 else 0
+    cs_roof_y = COT_RF[1] + t_cs * (COT_FER[1] - COT_RF[1])
+    _near_eave_pts = f"{roof_left[0]:.1f},{roof_left[1]:.1f} {COT_RF[0]:.1f},{COT_RF[1]:.1f} {COT_FER[0]:.1f},{COT_FER[1]:.1f}"
+    o.append(f'<clipPath id="eaveClip"><polygon points="{_near_eave_pts}"/></clipPath>')
+    _cs_x0 = chim_x - 23; _cs_x1 = chim_x + 23
+    _cs_y0 = cs_roof_y; _cs_y1 = cs_roof_y + 5
+    o.append(f'<g clip-path="url(#eaveClip)">')
+    o.append(f'<path d="M{_cs_x0:.1f},{_cs_y0:.1f} L{_cs_x1:.1f},{_cs_y0:.1f} L{_cs_x1:.1f},{_cs_y1:.1f} L{_cs_x0:.1f},{_cs_y1:.1f} Z" '
+             f'fill="#7d5a30" opacity="0.55"/>')
+    o.append(f'<path d="M{_cs_x0-4:.1f},{_cs_y0:.1f} Q{_cs_x0+_cs_x1*0.4:.1f},{_cs_y0+8:.1f} {_cs_x1:.1f},{_cs_y0+4:.1f} '
+             f'L{_cs_x1:.1f},{_cs_y0:.1f} Z" fill="#5a4422" opacity="0.32"/>')
+    o.append("</g>")
+
+    # ---- chimney smoke ----
+    o.append(chimney_smoke(cx_top=chim_x, base_y=chim_base_y, shaft_w=46, shaft_h=70,
                            iid="L8c-chimney-smoke"))
-    # 右侧木栅栏
+
+    # ---- right fence ----
     o.append(layer_fence(642, 556, 690, 566, 3, 62, "cfence"))
     o.append("</g>")
     return "".join(o)
@@ -748,7 +899,7 @@ def layer_cottage():
 def chimney_back(cx_top, base_y, shaft_w=46, shaft_h=46, iid="chimney-back"):
     """烟囱后段 — 仅绘制屋脊上方的烟囱体块。
 
-    在屋顶 path 之前调用, 让近侧屋顶 path 覆盖下沿实现"穿透"效果。
+    在 layer_cottage() 中先于屋顶绘制, 让近侧屋顶 path 覆盖下沿实现"穿透"效果。
     锚点 (cx_top, base_y) = 顶帽中线 x 与屋脊穿透线 y。
     `shaft_h` 仅表示屋脊之上可见的体块高度。
     """
@@ -797,12 +948,12 @@ def chimney_back(cx_top, base_y, shaft_w=46, shaft_h=46, iid="chimney-back"):
     return "".join(o)
 
 
-def chimney_contact(cx_top, base_y, shaft_w=46, roof_left=(515, 460), roof_right=(605, 462), iid="chimney-contact"):
+def chimney_contact(cx_top, base_y, shaft_w=46, iid="chimney-contact"):
     """屋面接触泛水 — 在近侧屋顶 path 之后绘制。
 
     沿烟囱底部 ~6px 高的梯形, 表示屋顶茅草与烟囱体块的接缝防水层。
-    由 `roof_left` / `roof_right` 给出的两点近似屋脊右侧斜面,
-    取 `base_y` 与屋面曲线的水平交线段作为泛水顶部。
+    `base_y` 是屋脊穿透处的 roof curve y 值 (约 420 at x=540);
+    泛水顶部与屋面曲线齐平, 近侧屋顶覆盖下沿形成"穿透"感。
     """
     o = [f'<g id="{iid}">']
     cl = cx_top - shaft_w / 2
@@ -868,52 +1019,132 @@ def line(x1, y1, x2, y2, **kw):
 
 
 def layer_doghouse():
-    """狗屋 (V02: 改为 dimetric 盒子 + 双坡顶, 与草屋/地块同投影方向).
+    """狗屋 (dimetric 盒子 + 双坡顶, 与草屋/地块同投影方向).
 
+    统一 dimetric 投影: U=(47,24), V=(-47,24).
     顺序:
       1. 地面阴影
       2. 盒子顶面 + 右侧面 (dimetric 平行四边形)
-      3. 盒子正面墙体 (矩形)
-      4. 山墙 (dimetric 三角) + 双坡顶 (前后两个平行四边形)
-      5. 茅草纹路
+      3. 盒子正面墙体 (平行四边形, 墙顶平行于 U)
+      4. 左山墙三角 + 近檐口平行四边形
+      5. 右后屋面 (dimetric 平行四边形)
       6. 入口
       7. 骨头 / 水盆
+
+    V02 修复 (2026-09-11): 前墙体改为平行四边形, 墙顶边平行于 U=(47,24).
     """
     o = ['<g id="L8b-doghouse">']
-    o.append(ell(362, 540, 44, 9, fill="#7d9a42", opacity="0.32"))
+    o.append(ell(359, 540, 44, 9, fill="#7d9a42", opacity="0.32"))
 
-    # ---- dimetric 盒子底座 (V02) ----
-    # 盒子正面 (330, 508, 66, 34); 短轴厚 14 -> 偏移 (14, 7)
-    # 顶面: (330,508) -> (344,515) -> (410,515) -> (396,508)
-    # 右侧: (396,508) -> (410,515) -> (410,549) -> (396,542)
-    o.append(poly([(330, 508), (344, 515), (410, 515), (396, 508)],
+    # ---- dimetric 参数 ----
+    DOG_FW = 66    # front width
+    DOG_FD = 14    # depth
+    DOG_WH = 34    # wall height
+    DOG_RH = 24    # roof height
+    U_MAG = math.sqrt(47**2 + 24**2)  # ≈52.8
+    V_MAG = U_MAG
+    k_u = DOG_FW / U_MAG   # ≈1.25
+    k_v = DOG_FD / V_MAG    # ≈0.265
+    U = (47.0 * k_u, 24.0 * k_u)    # (≈58.75, ≈30)
+    V = (-47.0 * k_v, 24.0 * k_v)   # (≈-12.4, ≈6.36)
+
+    # 实际顶点
+    DOG_FEL = (330.0, 508.0)  # front eave left
+    DOG_FER = (DOG_FEL[0] + U[0], DOG_FEL[1] + U[1])  # front eave right (≈388.75, 538)
+    DOG_BEL = (DOG_FEL[0] + V[0], DOG_FEL[1] + V[1])  # back eave left (≈317.6, 514.4)
+    DOG_BER = (DOG_FER[0] + V[0], DOG_FER[1] + V[1])  # back eave right (≈376.35, 544.36)
+    # Ridge: eave midpoint minus roof height
+    eave_mid_front = ((DOG_FEL[0] + DOG_FER[0]) / 2, (DOG_FEL[1] + DOG_FER[1]) / 2)
+    eave_mid_back = ((DOG_BEL[0] + DOG_BER[0]) / 2, (DOG_BEL[1] + DOG_BER[1]) / 2)
+    DOG_RF = (eave_mid_front[0], eave_mid_front[1] - DOG_RH)   # ridge front
+    DOG_RB = (eave_mid_back[0], eave_mid_back[1] - DOG_RH)      # ridge back
+    # Wall bottom corners
+    DOG_WALL_BL = (DOG_FEL[0], DOG_FEL[1] + DOG_WH)  # wall bottom left
+    DOG_WALL_BR = (DOG_FER[0], DOG_FER[1] + DOG_WH)  # wall bottom right
+
+    # ---- box top (dimetric parallelogram) ----
+    o.append(poly([DOG_FEL, DOG_FER, DOG_BER, DOG_BEL],
                   fill="#ead6b4", stroke="#b99f76", stroke_width="1.4"))
-    o.append(poly([(396, 508), (410, 515), (410, 549), (396, 542)],
+    # right face
+    # ---- right face (dimetric parallelogram, connects front eave to back eave) ----
+    # Polygon: top-left=FER, top-right=BER, bottom-right=(BER.x,BER.y+DOG_WH), bottom-left=(BEL.x,BEL.y+DOG_WH)
+    # Both top and bottom edges follow V direction (slope -0.511), forming proper parallelogram.
+    # FIX: bottom-left was (FER.x,FER.y+DOG_WH) which gives wrong direction. Correct is BEL+(0,DOG_WH).
+    o.append(poly([DOG_FER, DOG_BER,
+                   (DOG_BER[0], DOG_BER[1] + DOG_WH),
+                   (DOG_BEL[0], DOG_BEL[1] + DOG_WH)],
                   fill="#b89572", stroke="#7d5a30", stroke_width="1.4"))
 
-    # ---- 盒子正面墙体 ----
-    o.append(rect(330, 508, 66, 34, rx=4, fill="#e6d3b4", stroke="#b99f76", stroke_width="2"))
+    # ---- front wall (parallelogram, top edge parallel to back eave BEL->BER) ----
+    # FIX: both bottom corners must be BEL/DOG_WH and BER/DOG_WH, not DOG_WALL_BL/DOG_WALL_BR.
+    # Original [DOG_WALL_BL=(330,542), DOG_WALL_BR=(388.78,572.02), FER, FEL] had:
+    #   - bottom-right using FER.y+DOG_WH instead of BER.y+DOG_WH (wrong x and wrong y)
+    #   - top-right using FER instead of BER (wrong vertex)
+    #   - bottom-left using FEL.y+DOG_WH instead of BEL.y+DOG_WH (wrong x and wrong y)
+    # Corrected: top corners = BEL, BER; bottom corners = BEL+(0,DOG_WH), BER+(0,DOG_WH).
+    wall_pts = [(DOG_BEL[0], DOG_BEL[1] + DOG_WH), (DOG_BER[0], DOG_BER[1] + DOG_WH), DOG_BER, DOG_BEL]
+    o.append(poly(wall_pts, fill="#e6d3b4", stroke="#b99f76", stroke_width="2"))
 
-    # ---- 山墙前坡 (dimetric 三角, V02) ----
-    # 山墙顶点 (363, 486) 在盒子前缘中线, 三角底边在 (330, 508)-(396, 508)
-    o.append(path("M328,510 L363,486 L398,510 Z", fill="#c9903f", stroke="#a8762c", stroke_width="2"))
-    o.append(path("M325,512 L363,484 L401,512 L396,515 L363,491 L330,515 Z", fill="#e6bd6a"))
-    for k in range(8):
-        o.append(f'<path d="M{f(334+k*8)},508 L{f(363+(k-3.5)*1.4)},491" stroke="#b8913c" '
+    # ---- left gable triangle: FEL -> RF -> BEL ----
+    o.append(path(f"M{DOG_FEL[0]:.1f},{DOG_FEL[1]:.1f} "
+                f"L{DOG_RF[0]:.1f},{DOG_RF[1]:.1f} "
+                f"L{DOG_BEL[0]:.1f},{DOG_BEL[1]:.1f} Z",
+                fill="#c9903f", stroke="#a8762c", stroke_width="1.6"))
+
+    # ---- near eave parallelogram: FEL -> FER -> BER -> BEL ----
+    o.append(path(f"M{DOG_FEL[0]:.1f},{DOG_FEL[1]:.1f} "
+                f"L{DOG_FER[0]:.1f},{DOG_FER[1]:.1f} "
+                f"L{DOG_BER[0]:.1f},{DOG_BER[1]:.1f} "
+                f"L{DOG_BEL[0]:.1f},{DOG_BEL[1]:.1f} Z",
+                fill="#d4a84a", stroke="#a8762c", stroke_width="1.4"))
+
+    # Straw texture on left gable (along V direction)
+    for k in range(6):
+        t = (k + 0.5) / 6.0
+        gx = DOG_FEL[0] + t * (DOG_BEL[0] - DOG_FEL[0])
+        gy = DOG_FEL[1] + t * (DOG_BEL[1] - DOG_FEL[1])
+        rx = DOG_RF[0] + t * (DOG_RB[0] - DOG_RF[0])
+        ry = DOG_RF[1] + t * (DOG_RB[1] - DOG_RF[1])
+        o.append(f'<path d="M{gx:.1f},{gy:.1f} L{rx:.1f},{ry:.1f}" stroke="#b8913c" '
                  f'stroke-width="1.5" opacity="0.6"/>')
-    # ---- 山墙后坡 + 屋脊后段 (dimetric, V02) ----
-    # 山墙后顶点 = 前顶点 dimetric 偏移 (14, 7) -> (377, 493)
-    # 后坡 = (363, 486) -> (377, 493) -> (410, 515) -> (396, 508) -> 闭合
-    o.append(poly([(363, 486), (377, 493), (410, 515), (396, 508)],
+
+    # ---- right rear roof face (dimetric parallelogram) ----
+    o.append(poly([DOG_RF, DOG_RB, DOG_BER, DOG_FER],
                   fill="#a8763c", stroke="#7d5330", stroke_width="1.4", opacity="0.95"))
 
-    # ---- 入口 (保持原坐标, 在墙体下沿) ----
-    o.append(path("M349,542 L349,524 Q349,514 363,514 Q377,514 377,524 L377,542 Z",
+    # ---- entrance (on wall, affine mapped) ----
+    # Door: parallelogram on wall, width=28, height=28
+    door_w = 28
+    door_h = 28
+    door_cx = (DOG_FEL[0] + DOG_FER[0]) / 2
+    door_bl_x = door_cx - door_w / 2
+    # Door bottom at ground level
+    door_bl = (door_bl_x, DOG_FEL[1] + DOG_WH)
+    door_br = (door_bl_x + door_w, DOG_FEL[1] + DOG_WH)
+    # Door top on wall top line (parallel to U)
+    t_door = (door_bl_x - DOG_FEL[0]) / U[0] if U[0] != 0 else 0
+    door_tl = (door_bl_x, DOG_FEL[1] + t_door * U[1])
+    door_tr = (door_bl_x + door_w, DOG_FEL[1] + t_door * U[1])
+    # Outer frame
+    o.append(path(f"M{door_bl[0]:.1f},{door_bl[1]:.1f} "
+                  f"L{door_br[0]:.1f},{door_br[1]:.1f} "
+                  f"L{door_tr[0]:.1f},{door_tr[1]:.1f} "
+                  f"L{door_tl[0]:.1f},{door_tl[1]:.1f} Z",
                   fill="#5a3a20"))
-    o.append(path("M352,542 L352,525 Q352,517 363,517 Q374,517 374,525 L374,542 Z",
+    # Inner door (slightly smaller parallelogram)
+    inner_off = 3
+    inner_bl = (door_bl[0] + inner_off, door_bl[1] - inner_off)
+    inner_br = (door_br[0] - inner_off, door_br[1] - inner_off)
+    inner_tl = (door_tl[0] + inner_off, door_tl[1] + inner_off)
+    inner_tr = (door_tr[0] - inner_off, door_tr[1] + inner_off)
+    o.append(path(f"M{inner_bl[0]:.1f},{inner_bl[1]:.1f} "
+                  f"L{inner_br[0]:.1f},{inner_br[1]:.1f} "
+                  f"L{inner_tr[0]:.1f},{inner_tr[1]:.1f} "
+                  f"L{inner_tl[0]:.1f},{inner_tl[1]:.1f} Z",
                   fill="#3f2716"))
+
     # 骨头
-    o.append('<g transform="translate(363,502) rotate(-12) scale(0.84)">'
+    o.append('<g transform="translate(359,502) rotate(-12) scale(0.84)">'
              '<rect x="-13" y="-3" width="26" height="6" rx="3" fill="#f7f2e6" stroke="#c9c0ad" stroke-width="1.3"/>'
              '<circle cx="-12" cy="-3.6" r="4.6" fill="#f7f2e6" stroke="#c9c0ad" stroke-width="1.3"/>'
              '<circle cx="-12" cy="3.6" r="4.6" fill="#f7f2e6" stroke="#c9c0ad" stroke-width="1.3"/>'
@@ -1015,7 +1246,7 @@ DECOR_BLOCK = [
     (416, 382, 618, 572),     # 草屋
     (296, 458, 418, 562),     # 狗屋 + 食盆
     (186, 492, 268, 618),     # 木牌
-    (0, 434, 258, 560),       # 池塘 + 池边栅栏
+    (0, 434, 258, 560),       # 历史池塘区，当前候选已移除，保留框线用于审计参考
     (0, 540, 72, 674),        # 干草车
     (286, 828, 398, 942),     # 一键务农
     (0, 0, 692, 292),         # 顶部 HUD
@@ -1646,13 +1877,17 @@ LAYOUT = [
     # V04 重排: 时间胶囊下移右移至 (602, 482, 690, 514), 右沿留 2px 让描边不被裁切, 撤销与 cottage 的白名单
     ("clock_panel",  602,  482,  690,  514, "hud",  []),
     ("bubble_dog",   306,  441,  410,  478, "hud",  ["doghouse"]),
-    ("cottage",      424,  392,  612,  572, "prop", []),
-    ("doghouse",     318,  482,  404,  544, "prop", []),
+    # V02 修复后: cottage 包围盒根据实际顶点重新计算
+    # x: 418(COT_BEL.x) 到 593(roof_right=COT_FER.x+20 右出檐), y: 470(RF.y) 到 562(墙底)
+    ("cottage",      418,  470,  594,  562, "prop", []),
+    # V02 修复后: doghouse 包围盒根据实际顶点重新计算
+    # x: 317(DOG_BEL.x) 到 389(DOG_FER.x), y: 499(DOG_RF.y) 到 544(墙底)
+    ("doghouse",     317,  499,  389,  544, "prop", []),
     ("signs",        194,  494,  258,  584, "prop", []),
     ("plot_bed",     110,  581,  585,  832, "prop", []),
     ("grade_sign",   256,  612,  326,  698, "prop", []),
-    ("pond",           0,  448,  182,  538, "prop", []),
-    ("pond_fence",   146,  458,  252,  520, "prop", []),
+    # 历史: ("pond", 0, 448, 182, 538, "prop", []), 已删除
+    # 历史: ("pond_fence", 146, 458, 252, 520, "prop", []), 已删除
     ("fish",          32,  486,   98,  528, "prop", []),
     ("hay_cart",       0,  540,   70,  676, "prop", []),
     ("bl_fence",      22,  700,  116,  830, "prop", []),  # V01: 外移至地块床左缘外
@@ -1790,6 +2025,121 @@ def audit(verbose=True):
         if gap < required:
             problems.append(f"[间距] {upper}→{lower} 仅 {gap}px，需要 ≥{required}px")
 
+    # ---- 几何断言 (P1 S3 要求) ----
+    # dimetric 基础方向
+    _U = (47.0, 24.0)
+    _V = (-47.0, 24.0)
+    _U_len = math.sqrt(_U[0]**2 + _U[1]**2)
+    _V_len = math.sqrt(_V[0]**2 + _V[1]**2)
+
+    def _parallel_to(p1, p2, ref, tol_px=3.0):
+        """检查线段 (p1→p2) 是否与参考向量 ref 平行, 容差 tol_px/100。"""
+        dx = p2[0] - p1[0]; dy = p2[1] - p1[1]
+        if abs(dx) < 0.1 and abs(dy) < 0.1:
+            return True  # 零长线段, 视为平行
+        rdx = ref[0] / (math.sqrt(ref[0]**2 + ref[1]**2))
+        rdy = ref[1] / (math.sqrt(ref[0]**2 + ref[1]**2))
+        seg_len = math.sqrt(dx**2 + dy**2)
+        sdx = dx / seg_len; sdy = dy / seg_len
+        dot = abs(sdx * rdx + sdy * rdy)
+        # 平行: |dot| ≈ 1.0
+        return dot > 0.99
+
+    def _seg_intersect(p1, p2, p3, p4):
+        """检查线段 p1-p2 与 p3-p4 是否真相交 (非端点接触)。"""
+        def _cross(a, b, c):
+            return (b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0])
+        d1 = _cross(p3, p4, p1); d2 = _cross(p3, p4, p2)
+        d3 = _cross(p1, p2, p3); d4 = _cross(p1, p2, p4)
+        if d1*d2 > 0 or d3*d4 > 0:
+            return False
+        # 检查共线端点接触 (不算真相交)
+        if abs(d1) < 0.1 and abs(d2) < 0.1:
+            return False
+        if abs(d3) < 0.1 and abs(d4) < 0.1:
+            return False
+        return True
+
+    # ---- 重新计算 cottage 顶点 (与绘制代码一致) ----
+    COT_OY = 562; COT_FW = 152; COT_FD = 22; COT_WH = 92; COT_RH = 78
+    k_u_cot = COT_FW / _U_len
+    k_v_cot = COT_FD / _V_len
+    U_cot = (47.0 * k_u_cot, 24.0 * k_u_cot)
+    V_cot = (-47.0 * k_v_cot, 24.0 * k_v_cot)
+    COT_FEL = (438.0, 470.0)
+    COT_FER = (COT_FEL[0] + U_cot[0], COT_FEL[1] + U_cot[1])
+    COT_BEL = (COT_FEL[0] + V_cot[0], COT_FEL[1] + V_cot[1])
+    COT_BER = (COT_FER[0] + V_cot[0], COT_FER[1] + V_cot[1])
+    eave_mid_front_cot = ((COT_FEL[0] + COT_FER[0]) / 2, (COT_FEL[1] + COT_FER[1]) / 2)
+    eave_mid_back_cot = ((COT_BEL[0] + COT_BER[0]) / 2, (COT_BEL[1] + COT_BER[1]) / 2)
+    COT_RF = (eave_mid_front_cot[0], eave_mid_front_cot[1] - COT_RH)
+    COT_RB = (eave_mid_back_cot[0], eave_mid_back_cot[1] - COT_RH)
+
+    # ---- 重新计算 doghouse 顶点 (与绘制代码一致) ----
+    DOG_FW = 66; DOG_FD = 14; DOG_WH = 34; DOG_RH = 24
+    k_u_dog = DOG_FW / _U_len
+    k_v_dog = DOG_FD / _V_len
+    U_dog = (47.0 * k_u_dog, 24.0 * k_u_dog)
+    V_dog = (-47.0 * k_v_dog, 24.0 * k_v_dog)
+    DOG_FEL = (330.0, 508.0)
+    DOG_FER = (DOG_FEL[0] + U_dog[0], DOG_FEL[1] + U_dog[1])
+    DOG_BEL = (DOG_FEL[0] + V_dog[0], DOG_FEL[1] + V_dog[1])
+    DOG_BER = (DOG_FER[0] + V_dog[0], DOG_FER[1] + V_dog[1])
+    eave_mid_front_dog = ((DOG_FEL[0] + DOG_FER[0]) / 2, (DOG_FEL[1] + DOG_FER[1]) / 2)
+    eave_mid_back_dog = ((DOG_BEL[0] + DOG_BER[0]) / 2, (DOG_BEL[1] + DOG_BER[1]) / 2)
+    DOG_RF = (eave_mid_front_dog[0], eave_mid_front_dog[1] - DOG_RH)
+    DOG_RB = (eave_mid_back_dog[0], eave_mid_back_dog[1] - DOG_RH)
+
+    # 断言 1: 草屋墙顶边 (front eave) 平行于 U=(47,24)
+    cot_fl_top = COT_FEL
+    cot_fr_top = COT_FER
+    if not _parallel_to(cot_fl_top, cot_fr_top, _U):
+        problems.append(
+            f"[几何] cottage 墙顶边 ({cot_fl_top}→{cot_fr_top}) "
+            f"不平行于 U={(47,24)}; 当前 slope={(cot_fr_top[1]-cot_fl_top[1])/(cot_fr_top[0]-cot_fl_top[0]):.3f}, "
+            f"U slope={_U[1]/_U[0]:.3f}")
+    # 断言 2: 草屋右屋檐边平行于 V=(-47,24)
+    cot_fr_eave = COT_FER
+    cot_br_eave = COT_BER
+    if not _parallel_to(cot_fr_eave, cot_br_eave, _V):
+        problems.append(
+            f"[几何] cottage 右屋檐边 ({cot_fr_eave}→{cot_br_eave}) "
+            f"不平行于 V={_V}; 当前 slope={(cot_br_eave[1]-cot_fr_eave[1])/(cot_br_eave[0]-cot_fr_eave[0]):.3f}, "
+            f"V slope={_V[1]/_V[0]:.3f}")
+    # 断言 3: 狗屋墙顶边平行于 U
+    dog_fl_top = DOG_FEL
+    dog_fr_top = DOG_FER
+    if not _parallel_to(dog_fl_top, dog_fr_top, _U):
+        problems.append(
+            f"[几何] doghouse 墙顶边 ({dog_fl_top}→{dog_fr_top}) "
+            f"不平行于 U={(47,24)}; 当前 slope={(dog_fr_top[1]-dog_fl_top[1])/(dog_fr_top[0]-dog_fl_top[0]):.3f}")
+    # 断言 4: 狗屋右屋檐边平行于 V
+    dog_fr_eave = DOG_FER
+    dog_br_eave = DOG_BER
+    if not _parallel_to(dog_fr_eave, dog_br_eave, _V):
+        problems.append(
+            f"[几何] doghouse 右屋檐边 ({dog_fr_eave}→{dog_br_eave}) "
+            f"不平行于 V={_V}; 当前 slope={(dog_br_eave[1]-dog_fr_eave[1])/(dog_br_eave[0]-dog_fr_eave[0]):.3f}")
+    # 断言 5: clock_panel 与 cottage 的实际线段不相交
+    # clock_panel 矩形 (602,482)-(690,514)
+    clock_segs = [((602.0,482.0),(690.0,482.0)), ((690.0,482.0),(690.0,514.0)),
+                  ((690.0,514.0),(602.0,514.0)), ((602.0,514.0),(602.0,482.0))]
+    # cottage 实际轮廓 (使用修正后的顶点)
+    cot_footprint = [COT_FEL, COT_FER, COT_BER, COT_BEL]
+    cot_segs = [(cot_footprint[i], cot_footprint[(i+1)%4]) for i in range(4)]
+    for cs in clock_segs:
+        for ts in cot_segs:
+            if _seg_intersect(cs[0], cs[1], ts[0], ts[1]):
+                problems.append(
+                    f"[几何] clock_panel 线段 {cs} 与 cottage 轮廓线段 {ts} 相交 (真实几何重叠)")
+    # 断言 6: 狗屋与草屋实际轮廓不相交 (prop-prop 不查压盖, 但检查越界)
+    dog_footprint = [DOG_FEL, DOG_FER, DOG_BER, DOG_BEL]
+    for ds in [(dog_footprint[i], dog_footprint[(i+1)%4]) for i in range(4)]:
+        for ts in cot_segs:
+            if _seg_intersect(ds[0], ds[1], ts[0], ts[1]):
+                problems.append(
+                    f"[几何] doghouse 线段 {ds} 与 cottage 轮廓线段 {ts} 相交")
+
     if verbose:
         print(f"v24 审计: XML + {len(LAYOUT)} 个约束元素")
         if problems:
@@ -1835,7 +2185,7 @@ def build_defs():
              '<stop offset="100%" stop-color="#8e603c"/>'
              "</linearGradient>")
     # --- 水
-    d.append('<linearGradient id="waterGrad" x1="0" y1="0" x2="0.3" y2="1">'
+    d.append('<linearGradient id="unused_waterGrad" x1="0" y1="0" x2="0.3" y2="1">'
              '<stop offset="0%" stop-color="#8fcfe4"/>'
              '<stop offset="42%" stop-color="#6fb6d4"/>'
              '<stop offset="100%" stop-color="#4f96b4"/>'
@@ -1933,8 +2283,7 @@ def build():
     body.append(layer_mountains())
     body.append(layer_ground())
     body.append(layer_forest())
-    body.append(layer_pond())
-    body.append(layer_pondfence())
+    # 历史池塘与池边栅栏已移除 (2026-09-11)
     body.append(layer_fish())
     body.append(layer_hay_and_cart())
     body.append(layer_path())
@@ -1979,13 +2328,14 @@ def build_hit_areas():
     for name, label, cx, cy, width, height in HIT_AREAS:
         buttons.append(
             f'<button class="hit-target hit-{name}" aria-label="{label}" '
+            f'data-target="{name}" '
             f'style="--cx:{cx / W * 100:.5f}%;--cy:{cy / H * 100:.5f}%;'
             f'--w:{width / W * 100:.5f}%;--h:{height / H * 100:.5f}%"></button>')
     return '<div class="hit-layer" aria-label="农场快捷操作">' + "".join(buttons) + '</div>'
 
 
-HTML = """<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
+HTML = r"""<!DOCTYPE html>
+<html lang="zh-CN" data-state="normal"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>farm-v25</title>
 <style>
@@ -2001,6 +2351,12 @@ HTML = """<!DOCTYPE html>
   .hit-friend-close{left:auto;right:0;transform:translateY(-50%%);}
 </style></head><body><div id="stage">%s%s</div>
 <script>
+  // State interface: URL ?state=normal|guided sets document.documentElement.dataset.state
+  (function(){
+    var p=new URLSearchParams(location.search);
+    var s=p.get("state");
+    if(s==="normal"||s==="guided") document.documentElement.dataset.state=s;
+  })();
   const compact = () => document.getElementById('stage').clientWidth <= 430;
   function adaptCompactControls(){
     const shifts = compact() ? {'share-control':-11,'music-control':11,'menu-control':28} : {};
