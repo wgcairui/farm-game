@@ -59,6 +59,11 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   const jwtIssuer = process.env.JWT_ISSUER ?? 'farm-game';
   const jwtAudience = process.env.JWT_AUDIENCE ?? 'client';
   const jwtTtlSec = Number(process.env.JWT_TTL_SEC ?? String(7 * 24 * 3600));
+  if (!Number.isFinite(jwtTtlSec) || jwtTtlSec <= 0) {
+    throw new ConfigError(
+      `JWT_TTL_SEC must be a positive integer (received ${process.env.JWT_TTL_SEC ?? '<unset>'}). Refusing to start.`,
+    );
+  }
 
   const enableAdmin = process.env.ENABLE_ADMIN === '1';
   const enableMockAuth = process.env.ENABLE_MOCK_AUTH === '1';

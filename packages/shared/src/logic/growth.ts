@@ -7,6 +7,11 @@
  * shifted earlier by 5%. This matches PRD §2.2.3 verbatim and prevents
  * replay-based cheating where a client could pretend it watered more times
  * than the persisted `waterCount` reflects.
+ *
+ * G0 review fix (H4): failure reasons are split so the client UI can show
+ * "already ripe" vs "plot locked" distinctly, and corrupted `matureAt`
+ * values (NaN/Infinity from a bad save) are rejected with `corrupted` rather
+ * than silently producing `NaN`.
  */
 
 import { getCrop } from '../types/crop.js';
@@ -33,9 +38,11 @@ export function computeMatureAt(plantedAt: number, cropId: string): number | und
 
 export type ApplyWaterFailure =
   | 'unknown_crop'
-  | 'not_growing'
-  | 'already_ripe'
-  | 'limit_reached';
+  | 'not_growing'        // status is 'empty' (no crop planted)
+  | 'already_ripe'       // status is 'ready' (matureAt <= now)
+  | 'withered'           // status is 'withered'
+  | 'limit_reached'
+  | 'corrupted';         // matureAt missing or non-finite
 
 export interface ApplyWaterResult {
   matureAt: number;
@@ -47,9 +54,12 @@ export interface ApplyWaterResult {
  *
  * Returns `null` plus a `reason` on failure:
  *  - `unknown_crop` — `cropId` not in `CROPS`
- *  - `not_growing` — plot status is not 'growing' (empty / ready / withered)
- *  - `already_ripe` — `matureAt <= now` (PRD: cannot water a ripe crop)
+ *  - `not_growing` — status is 'empty' (no crop planted)
+ *  - `already_ripe` — status is 'ready' (matureAt reached)
+ *  - `withered` — status is 'withered'
  *  - `limit_reached` — `waterCount >= crop.maxWater`
+ *  - `corrupted` — `matureAt` is missing or non-finite (refuse rather than
+ *    propagate NaN into the next state)
  *
  * On success, `newMatureAt = now + ceil((oldMatureAt - now) × 0.95)`. Each water
  * therefore saves 5% of the time *remaining at that moment*, not of the original
@@ -59,15 +69,21 @@ export function applyWater(
   plot: PlotState,
   now: number,
 ): { ok: true; value: ApplyWaterResult } | { ok: false; reason: ApplyWaterFailure } {
-  if (!plot.cropId || plot.status !== 'growing') {
-    return { ok: false, reason: 'not_growing' };
-  }
+  if (plot.status === 'empty') return { ok: false, reason: 'not_growing' };
+  if (plot.status === 'ready') return { ok: false, reason: 'already_ripe' };
+  if (plot.status === 'withered') return { ok: false, reason: 'withered' };
+  // plot.status === 'growing' from here.
+  if (!plot.cropId) return { ok: false, reason: 'not_growing' };
   const cfg = getCrop(plot.cropId);
   if (!cfg) return { ok: false, reason: 'unknown_crop' };
-  if (typeof plot.matureAt !== 'number') return { ok: false, reason: 'not_growing' };
+  if (typeof plot.matureAt !== 'number' || !Number.isFinite(plot.matureAt)) {
+    return { ok: false, reason: 'corrupted' };
+  }
   if (plot.waterCount >= cfg.maxWater) return { ok: false, reason: 'limit_reached' };
 
   const remaining = plot.matureAt - now;
+  // remaining can be 0 if `now === matureAt` exactly (status should be 'ready'
+  // by then, but defend against clock skew).
   if (remaining <= 0) return { ok: false, reason: 'already_ripe' };
 
   const discounted = Math.ceil(remaining * (1 - WATER_DISCOUNT_PER));

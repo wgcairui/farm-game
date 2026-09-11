@@ -169,11 +169,11 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
 }
 
 function shouldBypassProtocolCheck(url: string): boolean {
-  // The probe path and admin health probe run before version negotiation; the
-  // handshake (/auth/wechat, /auth/_meta) must run with or without a header so
-  // we don't strand debug tooling. Per ADR §6 the major check still triggers
-  // 426 when a header *is* present and mismatched.
-  return url === '/healthz' || url === '/admin/healthz' || url.startsWith('/admin/');
+  // Probes (LB health checks, admin health probe) must succeed even when the
+  // client does not send `x-protocol-version`; auth/login routes do NOT bypass
+  // — a 426 on login is the correct behaviour when a future major-bumped
+  // client tries to talk to an older server (ADR-0001 §6).
+  return url === '/healthz' || url.startsWith('/admin');
 }
 
 function parseProtocolMajor(header: string): number | null {

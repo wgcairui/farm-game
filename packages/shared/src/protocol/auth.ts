@@ -8,7 +8,7 @@
  * the server actually validates.
  */
 
-import type { AuthProvider, AuthIdentityRef } from '../types/auth-identity.js';
+import type { AuthProvider, AuthIdentitySummary } from '../types/auth-identity.js';
 
 export interface JwtClaims {
   /** Internal playerId (UUID). Standard JWT subject. */
@@ -17,14 +17,14 @@ export interface JwtClaims {
   exp: number;
   iss: 'farm-game';
   aud: 'client';
-  /** Snapshot of identities at issue time. Read-only on the client side. */
-  identities: AuthIdentityRef[];
+  /** Snapshot of identities at issue time — summary only, no provider subjects. */
+  identities: AuthIdentitySummary[];
 }
 
 /** Public auth context returned alongside the token in `LoginResponse.auth`. */
 export interface AuthContext {
   playerId: string;
-  identities: AuthIdentityRef[];
+  identities: AuthIdentitySummary[];
   /** Standard JWT `exp`, echoed for client silent refresh. */
   expiresAt: number;
   /** Standard JWT `iat`, mirrored for client UI ("logged in since …"). */

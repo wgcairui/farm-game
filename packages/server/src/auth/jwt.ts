@@ -5,16 +5,12 @@
  * narrow contract the rest of the server reads back from a verified token.
  */
 
-import type { AuthIdentityRef } from '@farm-game/shared';
-
-export interface JwtCustomClaims {
-  identities: AuthIdentityRef[];
-}
+import type { AuthIdentitySummary } from '@farm-game/shared';
 
 /** Shape after Fastify has verified `iss`/`aud`/`exp`. */
 export interface VerifiedAuth {
   sub: string;                 // playerId
-  identities: AuthIdentityRef[];
+  identities: AuthIdentitySummary[];
 }
 
 export function isVerifiedAuth(v: unknown): v is VerifiedAuth {

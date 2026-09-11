@@ -9,7 +9,7 @@
  */
 
 import type { PlotState } from './plot.js';
-import type { AuthIdentityRef } from './auth-identity.js';
+import type { AuthIdentitySummary } from './auth-identity.js';
 
 export interface InventoryItem {
   itemId: string;
@@ -37,8 +37,11 @@ export interface PlayerSave {
   settings: PlayerSettings;
   createdAt: number;
   updatedAt: number;
-  /** Bound provider identities. Empty for a fresh player until first login binds it. */
-  identities: AuthIdentityRef[];
+  /**
+   * Bound provider identities — public projection only (no `subject`).
+   * To see your own provider subjects, call `GET /auth/identities/me` after login.
+   */
+  identities: AuthIdentitySummary[];
 }
 
 /**
@@ -48,7 +51,7 @@ export interface PlayerSave {
  */
 export function createDefaultPlayerSave(args: {
   playerId: string;
-  initialIdentity?: AuthIdentityRef;
+  initialIdentity?: AuthIdentitySummary;
 }): PlayerSave {
   const { playerId, initialIdentity } = args;
   const now = Date.now();

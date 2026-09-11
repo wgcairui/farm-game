@@ -105,7 +105,7 @@ test('Tampered JWT signature → 401 + 1101 INVALID_TOKEN', async () => {
   assert.equal(body.code, 1101);
 });
 
-test('AuthIdentity snapshot is preserved in JWT claims', async () => {
+test('AuthIdentity snapshot in JWT claims carries only the summary (no subject)', async () => {
   const token = await loginWeChat('mock_identities_test');
   const res = await fetch(`${baseUrl}/player/info`, {
     headers: { authorization: `Bearer ${token}` },
@@ -113,12 +113,13 @@ test('AuthIdentity snapshot is preserved in JWT claims', async () => {
   assert.equal(res.status, 200);
   const body = (await res.json()) as {
     ok: boolean;
-    data: { playerId: string; identities: Array<{ provider: string; subject: string }> };
+    data: { playerId: string; identities: Array<Record<string, unknown>> };
   };
   assert.equal(body.ok, true);
   assert.equal(body.data.identities.length, 1);
   assert.equal(body.data.identities[0]?.provider, AuthProvider.WeChatMini);
-  assert.equal(body.data.identities[0]?.subject, 'mock_identities_test');
+  // Public summary intentionally strips the subject (ADR-0001 §1; H1).
+  assert.equal('subject' in body.data.identities[0]!, false);
 });
 
 test('ConfigError in production when JWT_SECRET equals default', () => {
@@ -169,6 +170,66 @@ test('Identity rebinding to another player is rejected (IDENTITY_ALREADY_BOUND)'
   const meAgain = await fetch(`${baseUrl}/player/info`, { headers: { authorization: `Bearer ${tokenA}` } });
   const playerAgain = ((await meAgain.json()) as { data: { playerId: string } }).data.playerId;
   assert.equal(playerAgain, playerA);
+});
+
+test('PlayerSave.identities never leaks provider subjects (H1)', async () => {
+  // After login, /player/info identities must not contain `subject`.
+  const token = await loginWeChat('mock_no_leak_test');
+  const me = await fetch(`${baseUrl}/player/info`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  const body = (await me.json()) as {
+    data: { identities: Array<Record<string, unknown>> };
+  };
+  for (const id of body.data.identities) {
+    assert.equal('subject' in id, false, 'public identity must not carry a subject');
+  }
+});
+
+test('GET /auth/identities/me returns the owning subjects (H1 escape hatch)', async () => {
+  const token = await loginWeChat('mock_subject_visible_to_owner');
+  const me = await fetch(`${baseUrl}/auth/identities/me`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(me.status, 200);
+  const body = (await me.json()) as {
+    ok: boolean;
+    data: { identities: Array<{ provider: string; subject: string }> };
+  };
+  assert.equal(body.ok, true);
+  assert.equal(body.data.identities.length, 1);
+  assert.equal(body.data.identities[0]?.provider, 'weChatMini');
+  assert.equal(body.data.identities[0]?.subject, 'mock_subject_visible_to_owner');
+});
+
+test('Identity-index cleanup: removeIdentity lets the same identity be re-bound', async () => {
+  // Direct repo test — there's no /auth/unbind route in G0, so we exercise
+  // the index behaviour via the repo's own surface.
+  const repo = new InMemoryPlayerRepo();
+  const a = await ensurePlayer(repo, { provider: AuthProvider.IOS, subject: 'apple_xyz' });
+  const b = await ensurePlayer(repo, { provider: AuthProvider.Android, subject: 'goog_abc' });
+  assert.notEqual(a.playerId, b.playerId);
+
+  // Remove the iOS identity from player A.
+  await repo.removeIdentity(a.playerId, { provider: AuthProvider.IOS, subject: 'apple_xyz' });
+  // Player A no longer resolves by iOS identity.
+  const resolveA = await repo.findByIdentity({ provider: AuthProvider.IOS, subject: 'apple_xyz' });
+  assert.equal(resolveA, null);
+
+  // Player B can now bind that same iOS identity (would have thrown
+  // IdentityAlreadyBoundError before the removal).
+  await repo.addIdentity(b.playerId, { provider: AuthProvider.IOS, subject: 'apple_xyz', boundAt: Date.now() });
+  const resolveAgain = await repo.findByIdentity({ provider: AuthProvider.IOS, subject: 'apple_xyz' });
+  assert.equal(resolveAgain?.playerId, b.playerId);
+});
+
+test('ConfigError when JWT_TTL_SEC is non-numeric or non-positive (H6)', () => {
+  process.env.NODE_ENV = 'test';
+  for (const bad of ['abc', '-1', '0']) {
+    process.env.JWT_TTL_SEC = bad;
+    assert.throws(() => loadConfig(), /JWT_TTL_SEC must be a positive integer/, `ttl=${bad}`);
+  }
+  delete process.env.JWT_TTL_SEC;
 });
 
 test('ensurePlayer is idempotent on (provider, subject)', async () => {

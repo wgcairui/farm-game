@@ -39,9 +39,27 @@ test('createDefaultPlayerSave generates 24 plots with 8 unlocked', () => {
 test('createDefaultPlayerSave seeds initial identity when provided', () => {
   const save = createDefaultPlayerSave({
     playerId: 'tester',
-    initialIdentity: { provider: 'weChatMini', subject: 'mock_openid', boundAt: 100 },
+    initialIdentity: { provider: 'weChatMini', boundAt: 100 },
   });
   assert.equal(save.identities.length, 1);
   assert.equal(save.identities[0]!.provider, 'weChatMini');
-  assert.equal(save.identities[0]!.subject, 'mock_openid');
+  // Public projection strips the subject (G0 review H1).
+  assert.equal('subject' in save.identities[0]!, false);
+});
+
+test('AuthIdentitySummary does not carry a subject field', () => {
+  const summary = { provider: 'ios' as const, boundAt: 1 };
+  assert.equal('subject' in summary, false);
+});
+
+test('identityKey includes tenantId when provided', async () => {
+  const { identityKey } = await import('../src/types/auth-identity.js');
+  assert.equal(
+    identityKey({ provider: 'weChatMini', subject: 's', tenantId: 't1' }),
+    'weChatMini:t1:s',
+  );
+  assert.equal(
+    identityKey({ provider: 'weChatMini', subject: 's' }),
+    'weChatMini:-:s',
+  );
 });

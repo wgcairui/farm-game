@@ -103,17 +103,52 @@ test('applyWater rejects already_ripe when matureAt <= now', () => {
   assert.equal(r.reason, 'already_ripe');
 });
 
-test('applyWater rejects not_growing for empty / ready / withered plots', () => {
+test('applyWater rejects not_growing for empty plots', () => {
   const now = Date.now();
-  for (const status of ['empty', 'ready', 'withered'] as const) {
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'empty' as const,
+    plantedAt: now, waterCount: 0,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.reason, 'not_growing');
+});
+
+test('applyWater rejects already_ripe for ready plots (distinct from not_growing)', () => {
+  const now = Date.now();
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'ready' as const,
+    cropId: 'carrot', plantedAt: now - 30_000, matureAt: now - 100, waterCount: 0,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.reason, 'already_ripe');
+});
+
+test('applyWater rejects withered plots (distinct from already_ripe)', () => {
+  const now = Date.now();
+  const plot = {
+    id: 'p:0', index: 0, unlocked: true, status: 'withered' as const,
+    cropId: 'carrot', plantedAt: now - 60_000, matureAt: now - 30_000, waterCount: 0,
+  };
+  const r = applyWater(plot, now);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.reason, 'withered');
+});
+
+test('applyWater rejects corrupted matureAt (NaN/Infinity/missing)', () => {
+  const now = Date.now();
+  for (const matureAt of [Number.NaN, Number.POSITIVE_INFINITY, undefined as unknown as number]) {
     const plot = {
-      id: 'p:0', index: 0, unlocked: true, status,
-      cropId: status === 'empty' ? undefined : 'carrot',
-      plantedAt: now, matureAt: now + 30_000, waterCount: 0,
+      id: 'p:0', index: 0, unlocked: true, status: 'growing' as const,
+      cropId: 'carrot', plantedAt: now, matureAt, waterCount: 0,
     };
     const r = applyWater(plot, now);
-    assert.equal(r.ok, false, `status=${status}`);
-    if (!r.ok) assert.equal(r.reason, 'not_growing');
+    assert.equal(r.ok, false, `matureAt=${String(matureAt)}`);
+    if (!r.ok) assert.equal(r.reason, 'corrupted');
   }
 });
 

@@ -65,7 +65,9 @@ test('POST /auth/wechat → /player/info → /farm/unlock chain', async () => {
   const token = loginBody.data.token;
   assert.ok(token.length > 0);
   assert.ok(loginBody.data.player.playerId.length > 0);
-  assert.equal(loginBody.data.player.identities[0]?.subject, 'mock_code_1234567890');
+  assert.equal(loginBody.data.player.identities[0]?.provider, 'weChatMini');
+  // Public projection intentionally strips the subject (ADR-0001 §1).
+  assert.equal('subject' in (loginBody.data.player.identities[0] ?? {}), false);
 
   const me = await fetch(`${baseUrl}/player/info`, {
     headers: { authorization: `Bearer ${token}` },

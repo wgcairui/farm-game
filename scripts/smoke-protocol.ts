@@ -62,7 +62,7 @@ async function main(): Promise<number> {
     if (!login.ok) throw new Error(login.message);
     const { token, player } = login.data;
     expect('login.player.playerId is uuid-like', /^[0-9a-f-]{8,}$/i.test(player.playerId), player.playerId);
-    expect('login.player.identities[0].subject matches code', player.identities[0]?.subject === 'mock_smoke_code_xyz');
+    expect('login.player.identities[0] carries provider only (no subject)', player.identities[0]?.provider === 'weChatMini' && !('subject' in (player.identities[0] ?? {})));
     client.setToken(token);
 
     // 3. /crop/configs
