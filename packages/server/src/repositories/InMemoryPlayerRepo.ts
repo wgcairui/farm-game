@@ -5,6 +5,12 @@
  * `MikroORMPlayerRepo` so existing unit tests can exercise the same
  * semantics without touching PostgreSQL. NOT used in production boot.
  *
+ * Known drift vs `MikroORMPlayerRepo`: plot `status` is returned as stored —
+ * the PG repo derives `growing → ripe` at projection time (ADR-0003 D23),
+ * this repo does not. Farm commands reject InMemory mode at the route layer,
+ * so the drift is only observable to unit tests that never assert ripe
+ * transitions.
+ *
  * The production wiring lives in `auth/routes.ts` (DI'd via `BuildAppOptions`).
  */
 

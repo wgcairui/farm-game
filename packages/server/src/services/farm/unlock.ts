@@ -10,8 +10,8 @@ import { ErrorCode } from '@farm-game/shared';
 import { EntityManager, LockMode } from '@mikro-orm/core';
 import { Plot } from '../../db/entities/Plot.js';
 import { Player } from '../../db/entities/Player.js';
-import { hashRequestBody, loadReceipt, persistReceipt } from './receipts.js';
-import { failure, replayedFailure, replayedSuccess, success, type CommandOutcome } from './outcome.js';
+import { hashRequestBody, loadReceipt, persistReceipt, projectReplay } from './receipts.js';
+import { failure, success, type CommandOutcome } from './outcome.js';
 import type { FarmUnlockPayload } from '@farm-game/shared';
 
 export const UNLOCK_PRICE_GOLD = 100;
@@ -38,6 +38,11 @@ export async function unlockCommand(args: UnlockArgs): Promise<CommandOutcome<Fa
     { lockMode: LockMode.PESSIMISTIC_WRITE },
   );
   if (!player) {
+    // No player row to serialise on. Check for a prior receipt (lock-free)
+    // so retrying a previously-settled operationId replays instead of
+    // colliding on the receipts unique constraint.
+    const prior = await loadReceipt<FarmUnlockPayload>(em, playerId, operationId, 'unlock', requestHash);
+    if (prior) return projectReplay(prior);
     return persistReceipt<FarmUnlockPayload>({
       em, playerId, operationId, command: 'unlock', requestHash, serverNow,
       outcome: failure<FarmUnlockPayload>(ErrorCode.NOT_AUTHENTICATED, 'player row missing'),
@@ -47,11 +52,7 @@ export async function unlockCommand(args: UnlockArgs): Promise<CommandOutcome<Fa
   const replayed = await loadReceipt<FarmUnlockPayload>(
     em, playerId, operationId, 'unlock', requestHash,
   );
-  if (replayed) {
-    return replayed.outcome.ok
-      ? replayedSuccess<FarmUnlockPayload>(replayed.outcome.payload, replayed.outcome.revision)
-      : replayedFailure<FarmUnlockPayload>(replayed.outcome.code, replayed.outcome.message);
-  }
+  if (replayed) return projectReplay(replayed);
 
   if (!Number.isInteger(body.plotIndex) || body.plotIndex < 0 || body.plotIndex > MAX_PLOT_INDEX) {
     return persistReceipt<FarmUnlockPayload>({

@@ -14,8 +14,8 @@ import {
 import { LockMode } from '@mikro-orm/core';
 import { Plot } from '../../db/entities/Plot.js';
 import { Player } from '../../db/entities/Player.js';
-import { hashRequestBody, loadReceipt, persistReceipt } from './receipts.js';
-import { failure, replayedFailure, replayedSuccess, success, type CommandOutcome } from './outcome.js';
+import { hashRequestBody, loadReceipt, persistReceipt, projectReplay } from './receipts.js';
+import { failure, success, type CommandOutcome } from './outcome.js';
 import { derivePlotStatus } from './plot-state.js';
 
 export interface HarvestArgs {
@@ -36,6 +36,11 @@ export async function harvestCommand(args: HarvestArgs): Promise<CommandOutcome<
     { lockMode: LockMode.PESSIMISTIC_WRITE },
   );
   if (!player) {
+    // No player row to serialise on. Check for a prior receipt (lock-free)
+    // so retrying a previously-settled operationId replays instead of
+    // colliding on the receipts unique constraint.
+    const prior = await loadReceipt<FarmHarvestPayload>(em, playerId, operationId, 'harvest', requestHash);
+    if (prior) return projectReplay(prior);
     return persistReceipt({
       em, playerId, operationId, command: 'harvest', requestHash, serverNow,
       outcome: failure<FarmHarvestPayload>(ErrorCode.NOT_AUTHENTICATED, 'player row missing'),
@@ -45,11 +50,7 @@ export async function harvestCommand(args: HarvestArgs): Promise<CommandOutcome<
   const replayed = await loadReceipt<FarmHarvestPayload>(
     em, playerId, operationId, 'harvest', requestHash,
   );
-  if (replayed) {
-    return replayed.outcome.ok
-      ? replayedSuccess<FarmHarvestPayload>(replayed.outcome.payload, replayed.outcome.revision)
-      : replayedFailure<FarmHarvestPayload>(replayed.outcome.code, replayed.outcome.message);
-  }
+  if (replayed) return projectReplay(replayed);
 
   if (!Number.isInteger(body.plotIndex) || body.plotIndex < 0 || body.plotIndex > 23) {
     return persistReceipt({

@@ -52,7 +52,12 @@ export interface ExecuteResult<TPayload> {
   /** True if the outcome came from a persisted receipt (replay path). */
   replayed: boolean;
   serverNow: number;
-  player: PlayerSave;
+  /**
+   * Current player snapshot. Null only when the player row is missing AND
+   * the outcome is a failure (e.g. NOT_AUTHENTICATED persisted by the
+   * service) — success outcomes always require a readable player.
+   */
+  player: PlayerSave | null;
 }
 
 export async function executeCommand<TBody, TPayload>(
@@ -64,16 +69,19 @@ export async function executeCommand<TBody, TPayload>(
     // The service is responsible for persisting its own operation receipt.
     const outcome = await args.run({ em, playerId: args.playerId, serverNow });
     const player = await ctx.repo.materialisePlayer(em, args.playerId);
-    if (!player) throw new Error(`player ${args.playerId} vanished mid-command`);
+    // A missing player row only invalidates SUCCESS outcomes — failure
+    // receipts (e.g. the services' NOT_AUTHENTICATED branch) must still
+    // commit and surface as 401 instead of crashing with a 500.
+    if (!player && outcome.ok) throw new Error(`player ${args.playerId} vanished mid-command`);
 
     // `replayed` is set by the service itself via a private outcome flag —
     // services call `loadReceipt` and return the persisted result with
-    // `outcome.replayed = true` so we can distinguish a fresh execution
+    // `outcome._replayed = true` so we can distinguish a fresh execution
     // from an idempotent replay without inspecting revision arithmetic.
     const replayed = outcome._replayed === true;
 
     const base = {
-      revision: player.revision,
+      revision: player?.revision ?? 0,
       serverNow,
       player,
       operationRevision: outcome.ok ? outcome.revision : null,

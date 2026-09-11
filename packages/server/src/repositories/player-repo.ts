@@ -86,15 +86,33 @@ export function generatePlayerId(): string {
  * `createDefaultPlayerSave({ playerId })` (6 unlocked plots, 200 gold).
  * Passing a custom factory lets callers inject extra seeding (e.g. an
  * initial identity summary on the public envelope).
+ *
+ * Concurrent-first-login guarantee: when two callers race the same identity,
+ * exactly one insert wins; the loser's transaction is rolled back by the
+ * repo (unique constraint on `auth_identities`) and surfaces here as
+ * `IdentityAlreadyBoundError`. Because the constraint only fires after the
+ * winner's identity row is committed, a fresh read in a NEW transaction
+ * reliably returns the canonical player — so both callers end up with 200
+ * and the same playerId instead of a 500 + orphan row.
  */
 export async function ensurePlayer(
   repo: PlayerRepo,
   identity: Pick<AuthIdentity, 'provider' | 'subject' | 'tenantId'>,
   createSave?: (playerId: string) => PlayerSave,
 ): Promise<PlayerSave> {
-  return repo.getOrCreateByIdentity(identity, (playerId) =>
-    createSave ? createSave(playerId) : createDefaultPlayerSave({ playerId }),
-  );
+  try {
+    return await repo.getOrCreateByIdentity(identity, (playerId) =>
+      createSave ? createSave(playerId) : createDefaultPlayerSave({ playerId }),
+    );
+  } catch (err) {
+    if (err instanceof IdentityAlreadyBoundError) {
+      // Loser of the race. The winner has committed by now (see above), so
+      // re-read in a fresh transaction — `findByIdentity` opens its own.
+      const winner = await repo.findByIdentity(identity);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 }
 
 // Re-export AuthIdentitySummary so existing imports keep working.

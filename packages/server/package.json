@@ -20,12 +20,10 @@
     "db:down": "docker compose -f compose.yml down",
     "db:reset": "docker compose -f compose.yml down -v && docker compose -f compose.yml up -d postgres",
     "db:migrate": "node --import tsx src/db/migrate.ts up",
-    "db:migrate:test": "TEST_DB_URL=postgres://farm:farm@127.0.0.1:5432/farm_game_test MAIN_DB_URL=$TEST_DB_URL node --import tsx src/db/migrate.ts up",
+    "db:migrate:test": "TEST_DB_URL=postgres://farm:farm@127.0.0.1:5432/farm_game_test node --import tsx src/db/migrate.ts up",
     "db:lint": "docker compose -f compose.yml config -q",
     "demo:loop": "node --import tsx scripts/demo-loop.ts",
-    "smoke": "node --import tsx scripts/smoke-protocol.ts",
-    "spike:realtime": "node --import tsx scripts/spike-realtime.ts",
-    "spike:realtime:client": "node --import tsx scripts/spike-realtime-client.ts"
+    "smoke": "node --import tsx scripts/smoke-protocol.ts"
   },
   "dependencies": {
     "@colyseus/admin": "0.18.5",

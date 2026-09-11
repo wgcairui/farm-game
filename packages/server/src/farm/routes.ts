@@ -180,13 +180,19 @@ function projectResponse<TPayload>(
     operationRevision: number | null;
     replayed: boolean;
     serverNow: number;
-    player: import('@farm-game/shared').PlayerSave;
+    player: import('@farm-game/shared').PlayerSave | null;
   },
   meta: { operationId: string },
 ): ApiResponse<CommandResponse<TPayload>> {
   if (!result.ok) {
     reply.code(businessHttpStatus(result.code));
     return { ok: false, code: result.code ?? ErrorCode.BAD_REQUEST, message: result.message ?? 'command failed' };
+  }
+  if (!result.player) {
+    // executeCommand guarantees a non-null player on success outcomes; this
+    // branch is a defensive guard, not an expected path.
+    reply.code(500);
+    return { ok: false, code: ErrorCode.INTERNAL, message: 'player state unavailable' };
   }
   const data: CommandResponse<TPayload> = {
     operationId: meta.operationId,

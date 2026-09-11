@@ -211,10 +211,6 @@ test('G1: reuse operationId with different params returns OPERATION_ID_REUSED', 
   const seed = (await client!.plantPlot(0, 'carrot', op)) as ApiResponse<FarmPlantResponse>;
   assert.equal(seed.ok, true);
   const mismatch = (await client!.plantPlot(1, 'carrot', op)) as ApiResponse<FarmPlantResponse>;
-  if (mismatch.ok) {
-    // eslint-disable-next-line no-console
-    console.error('debug mismatch response:', JSON.stringify(mismatch, null, 2));
-  }
   assert.equal(mismatch.ok, false, 'expected ok:false for operationId reuse with different params');
   assert.equal(
     (mismatch as { ok: false; code: number }).code,
@@ -291,28 +287,51 @@ test('G1: insufficient gold leaves the plot and gold unchanged', async () => {
 
 test('G1: concurrent first-login with the same identity returns one player, no 500', async () => {
   requireDb();
-  // Two parallel first-time logins for the same WeChat code must converge on
-  // a single playerId. The atomic get-or-create in T1 closes the old race
-  // window that produced an orphan player + a 500 from addIdentity's
-  // unique-violation. The losing transaction is rejected and the client
-  // can simply retry (the next call finds the identity already bound).
+  // Two parallel first-time logins for the same WeChat code must BOTH
+  // succeed with the same playerId. `ensurePlayer` catches the loser's
+  // IdentityAlreadyBoundError and re-reads the winner in a fresh
+  // transaction, so neither caller observes a 500 and exactly one player
+  // row exists for this identity (T1 review-fix).
   const code = `mock_int_race_${Date.now()}_${Math.random()}`;
   const [a, b] = await Promise.all([
     client!.loginWeChat({ code }),
     client!.loginWeChat({ code }),
   ]);
-  // At least one must succeed. The losing transaction either returns the
-  // winning player too, or surfaces the IdentityAlreadyBoundError. We don't
-  // assert a specific shape here — just that the suite doesn't blow up and
-  // that exactly one player row exists for this code.
-  const successes = [a, b].filter((r): r is { ok: true; data: LoginResponse } => r.ok);
-  assert.ok(successes.length >= 1, 'at least one first-login must succeed');
+  assert.equal(a.ok, true, `first concurrent login failed: ${JSON.stringify(a)}`);
+  assert.equal(b.ok, true, `second concurrent login failed: ${JSON.stringify(b)}`);
+  const aData = (a as { ok: true; data: LoginResponse }).data;
+  const bData = (b as { ok: true; data: LoginResponse }).data;
+  assert.equal(aData.player.playerId, bData.player.playerId, 'both logins must converge on the same playerId');
 
   const em = orm!.em.fork();
+  // The code already starts with `mock_`, so the auth route uses the code
+  // verbatim as the identity subject (the `mock_<first16>` fallback only
+  // applies to non-mock codes).
+  // MikroORM rewrites `?` placeholders to $n for postgres; passing raw `$1`
+  // leaves it unbound (42P02), so use the `?` form.
   const rows = await em.getConnection().execute(
-    `SELECT COUNT(*)::int AS n FROM auth_identities WHERE provider = 'weChatMini' AND subject = $1`,
-    [`mock_${code.slice(0, 16)}`],
+    `SELECT COUNT(*)::int AS n FROM auth_identities WHERE provider = 'weChatMini' AND subject = ?`,
+    [code],
   );
   const count = Number((rows[0] as unknown as { n: number }).n);
   assert.equal(count, 1, `exactly one identity row should exist, got ${count}`);
+});
+
+test('G1: planting over a ripe crop is rejected (PLOT_NOT_EMPTY)', async () => {
+  requireDb();
+  const data = await login(`mock_int_ripe_${Date.now()}`);
+  client!.setToken(data.token);
+  await client!.unlockPlot(6);
+  const plant = (await client!.plantPlot(0, 'carrot')) as ApiResponse<FarmPlantResponse>;
+  assert.equal(plant.ok, true);
+  const matureAt = (plant as { data: FarmPlantResponse }).data.payload.plot.matureAt;
+  await new Promise((r) => setTimeout(r, Math.max(0, (matureAt ?? Date.now()) - Date.now()) + 500));
+  // Plot is now ripe — replanting must fail instead of silently destroying
+  // the unharvested crop (T1 review-fix; was allowed before).
+  const replant = (await client!.plantPlot(0, 'carrot')) as ApiResponse<FarmPlantResponse>;
+  assert.equal(replant.ok, false, 'planting over a ripe crop must fail');
+  assert.equal(
+    (replant as { ok: false; code: number }).code,
+    ErrorCode.PLOT_NOT_EMPTY,
+  );
 });

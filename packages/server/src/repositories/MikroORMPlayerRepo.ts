@@ -20,7 +20,6 @@
 import { createDefaultPlayerSave } from '@farm-game/shared';
 import {
   EntityManager,
-  LockMode,
   UniqueConstraintViolationException,
 } from '@mikro-orm/core';
 
@@ -125,8 +124,12 @@ export class MikroORMPlayerRepo implements PlayerRepo {
       }
 
       // Try to bind the identity. If a concurrent caller raced past the
-      // `existing` check and inserted first, swallow the unique violation
-      // and read back the winning identity.
+      // `existing` check and committed first, the unique constraint fires
+      // here. PG has already aborted this transaction at that point, so
+      // "swallow and read back the winner" is impossible in-transaction;
+      // instead we throw and let `ensurePlayer` re-read the winner in a
+      // fresh transaction. The loser-side player + plots inserted above are
+      // rolled back with this transaction — the winner's rows stay canonical.
       try {
         em.persist(
           em.create(AuthIdentity, {
@@ -140,11 +143,6 @@ export class MikroORMPlayerRepo implements PlayerRepo {
         await em.flush();
       } catch (err) {
         if (!(err instanceof UniqueConstraintViolationException)) throw err;
-        // Roll back the loser-side player + plots we just inserted so the
-        // winner's transaction owns the only canonical record.
-        // Note: `ensurePlayer`'s semantics return the winning player's save,
-        // not the losing attempt's. Throwing away the just-inserted save is
-        // intentional — it is never observable to the caller.
         throw new IdentityAlreadyBoundError(
           identity.provider,
           identity.subject,
@@ -366,16 +364,5 @@ export class MikroORMPlayerRepo implements PlayerRepo {
     if (player.nickname) save.nickname = player.nickname;
     if (player.avatarUrl) save.avatarUrl = player.avatarUrl;
     return save;
-  }
-
-  /** Convenience: lock the player row inside the current transaction. */
-  async lockPlayer(em: EntityManager, playerId: string): Promise<Player> {
-    // Lock via direct query: PESSIMISTIC_WRITE on a freshly-loaded row.
-    // `em.lock()` requires an entity instance (getReference returns a
-    // Reference<Player> wrapper for fresh ids), so we fetch first then
-    // lock — still within the same transaction.
-    const row = await em.findOneOrFail(Player, { playerId });
-    await em.lock(row, LockMode.PESSIMISTIC_WRITE);
-    return row;
   }
 }

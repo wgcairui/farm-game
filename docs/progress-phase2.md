@@ -196,3 +196,23 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 - 真实 PG 集成测试在本次提交中未运行；T2 commit 之前必须 `pnpm db:up && pnpm db:migrate:test && pnpm test:integration` 跑一遍 8/8 全绿。
 - 业务错误码 `OPERATION_ID_REUSED` 已加入 `packages/shared`，下次升级协议 major 时需记录。
 - `auth/routes.ts` 的 production fail-closed 改变了 prod 默认行为——任何依赖“裸字符串即可登录”的内部脚本会失效。如有内部脚本依赖 stub 登录，必须改用 `mock_` 前缀并 `ENABLE_MOCK_AUTH=1`。
+
+### 7.4 T1 review-fix（code review 高优先项收口）
+
+只读 code-review 对 T0+T1 提出两处必修 + 一处断言收紧，本节全部落地：
+
+- **并发首登 loser 不再 500**：`ensurePlayer` 捕获 `IdentityAlreadyBoundError` 后在新事务里 `findByIdentity` 回读赢家（唯一约束只在赢家提交后才触发，回读必然命中），两个并发首登均返回 200 + 同一 playerId。`MikroORMPlayerRepo.getOrCreateByIdentity` 的误导性注释同步改写为与实现一致（PG abort 后同事务内 swallow + 回读不可实现）。
+- **“player 缺失 → 失败收据” 变为可达**：`executeCommand` 只在成功 outcome 时要求 player 可读（原实现无条件 `materialisePlayer` 并在 null 时 throw → 回滚收据 → 500）。`ExecuteResult.player` 放宽为 `PlayerSave | null`，route 层成功路径加防御性收窄。服务端 missing-player 分支同时先查一次收据，避免重试已结算 operationId 时撞收据唯一约束。
+- **plant 不再允许覆盖 ripe 作物**（review 范围外发现，随本 fix 收口）：`liveStatus !== 'empty'` 即拒绝 `PLOT_NOT_EMPTY`，与文件头 "MUST be unlocked and empty" 及 G2 计划一致；新增集成场景验证。
+- **并发首登测试断言收紧**：由 `successes.length >= 1` 改为两条登录均 200 且 playerId 相同。
+- **清理**：删除 `receipts.ts` 死代码（`PersistedReceipt` / `buildResponse`）、`MikroORMPlayerRepo.lockPlayer`（T1 锁重构后无调用方）、`water.ts` 的 `void getCrop` 残留、指向已删除 spike 脚本的 npm scripts、测试内 debug `console.error`；`InMemoryPlayerRepo` 补与 PG repo 的 ripe 推导差异说明。
+- **顺手修复**：`db:migrate:test` 脚本 `MAIN_DB_URL=$TEST_DB_URL` 的 shell 展开顺序 bug（同一命令行内赋值展开取旧值）——`migrate.ts` 本就直接接受 `TEST_DB_URL`。
+
+**验证矩阵（review-fix 后，真实 PG）**：
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测 | ✅ 66/66 |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG | ✅ **9/9**（G1 六项 + review-fix 新增三项：跨命令 OPERATION_ID_REUSED、并发首登收敛、ripe 禁重播） |
