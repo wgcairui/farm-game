@@ -216,3 +216,66 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 | `pnpm -r test` | 单测 | ✅ 66/66 |
 | `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
 | `pnpm --filter @farm-game/server test:integration` | 真实 PG | ✅ **9/9**（G1 六项 + review-fix 新增三项：跨命令 OPERATION_ID_REUSED、并发首登收敛、ripe 禁重播） |
+
+---
+
+## 8. T2 落地（房间所有权租约 + WS 入口基础设施）
+
+> 起点：T1 + review-fix 后命令层已可承接 HTTP/WS 共用。本节交付 G2 的所有权仲裁与 WS 进程基础设施；真实 FarmRoom 命令处理与广播在 T3。
+
+### 8.1 关键决策与 SDK 核实
+
+- **`@colyseus/core` 0.18.12 下的 Redis 组件**：`@colyseus/redis-driver@0.18.2`（`RedisDriver implements MatchMakerDriver`，matchmaker 目录）与 `@colyseus/redis-presence@0.18.4`（`RedisPresence implements Presence`，pub/sub presence）均已安装并核实导出；core peer `^0.18.5` / `^0.18.11` 均满足。
+- **所有权不交给 Redis**：RedisDriver 只共享房间目录；同一农场的单一活跃房间所有者由 PostgreSQL `farm_room_leases` 表仲裁。每次 WS 写命令在命令事务内 `assertCurrent`（`SELECT ... FOR UPDATE`）做 fencing，防止旧实例在租约被接管后继续提交资产变更。
+- **时钟策略**：租约的所有过期判断一律用数据库时钟（SQL `now()`），不依赖 WS 主机墙钟。
+- **Redis 无业务状态**：compose 中 redis 无 volume；进程级 `instanceId`（UUID）随租约落库用于 fencing。
+
+### 8.2 新增与改动
+
+**迁移与仓储**
+
+- `db/sql/0002-g2-room-leases.{up,down}.sql`：`farm_room_leases`（owner_id PK/FK players、room_id、instance_id、epoch BIGINT、expires_at/updated_at）。释放保留行并置 `expires_at = now()`（epoch 不重置，接管必递增）。
+- `repositories/room-lease-repo.ts`：`acquire`（单条条件 UPDATE 实现过期接管 epoch+1 / 同持有者续借 epoch 不变；条件 INSERT 处理首租；真冲突时抛 `LeaseConflictError` 携带持有者信息）、`renew`（room+instance+epoch+`expires_at > now()` 四重 guard，过期不可原地复活）、`release`（仅过期自己的租约）、`findCurrent`、`assertCurrent(em, lease)`（命令事务内 FOR UPDATE + epoch 校验，抛 `LeaseLostError`）。
+
+**迁移互斥**
+
+- `db/migrator.ts`：`applyPendingMigrations` / `rollbackLastMigration` 包进 `pg_advisory_lock`（key `0x6661726d`），HTTP 与 WS 双进程并发启动不再竞争 DDL。
+
+**入口与接线**
+
+- `bootstrap.ts`：共享 DB 装配（迁移 → MikroORM → repo/tx → 租约 pool(max 4) + `RoomLeaseRepo` → `instanceId`），单一 `close()` 释放；`MAIN_DB_URL` 缺失时 WS 入口 fail-closed。
+- `realtime/serve.ts`：独立 Colyseus 进程（`dev:ws` / `start:ws`）。`REDIS_URL` 存在时挂 RedisDriver+RedisPresence（含启动探测，连接失败即拒绝启动），否则 LocalDriver（仅 dev）。
+- `realtime/room.ts`：替换 G0 stub。T2 骨架版 `FarmRoom`：`roomId = ownerId`；`onCreate` 竞争租约（冲突 → 建房失败，客户端 join 报错可重试）；`this.clock.setInterval` 按 `LEASE_RENEW_MS` 续租，失租即 `disconnect()` 停止服务（完整排空语义 T4）；`onDispose` 停表 + 释放租约。JWT onAuth、四命令、快照广播留待 T3。
+- `config.ts`：新增 `wsPort`（2567）、`wsHost`、`redisUrl`、`leaseTtlMs`（15000）、`leaseRenewMs`（5000）+ 校验（renew 必须 < TTL；production 无 REDIS_URL 拒绝启动）。
+- `index.ts`：复用 `bootstrapDatabase`，与 WS 入口共享同一装配路径。
+- `compose.yml`：新增 `redis:7-alpine`（127.0.0.1:6379，healthcheck，无 volume）；`db:up` 同时启动 postgres + redis。
+- `.env.example`：新增 G2 段（WS_HOST/WS_PORT/REDIS_URL/LEASE_TTL_MS/LEASE_RENEW_MS）。
+
+### 8.3 集成测试（`test/integration/room-lease.test.ts`，真实 PG）
+
+两个独立 pg Pool 模拟两个 WS 进程（真 OS 进程级测试在 T5）：
+
+- 首租 epoch=1；活跃租约拒绝其他实例（`LeaseConflictError` 携带持有者 roomId/instanceId/到期时间）；
+- 同持有者重复 acquire 续借且 epoch 不变；
+- release → `findCurrent` 为 null → 其他实例接管 epoch=2；
+- renew 的 room/instance/epoch guard；过期租约 renew 返回 null（不可复活）；
+- 强制过期（SQL 置 `expires_at` 到过去）后跨实例接管 epoch 递增、旧 handle renew 失败；
+- `assertCurrent` 在真实事务内通过 / 接管后抛 `LeaseLostError`。
+
+**基础设施修复**：`test:integration` 加 `--test-concurrency=1`——两个集成测试文件并行 TRUNCATE 同批表会死锁（本次实测复现），文件级串行后消除。
+
+### 8.4 验证矩阵（T2 后，真实 PG + Redis compose 就绪）
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测 | ✅ 66/66 |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG（G1 9 项 + 租约 8 项） | ✅ **17/17** |
+
+### 8.5 T3 需要接手的点
+
+- `FarmRoom.onAuth`：JWT 验证（HTTP 同款 iss/aud/exp），`options.ownerId` 与 token `sub` 强一致；非本人农场拒绝。
+- 四命令 handler：委托 `executeCommand` 并在命令事务内先 `assertCurrent`（fencing），提交后刷新快照广播。
+- `welcome/snapshot`：进房后从 DB 读全量投影发送；多连接广播；WS envelope 采用 shared `protocol/ws.ts` 的 G2 版本。
+- Redis 双进程行为、HTTP→WS 同步、重连恢复：T4。

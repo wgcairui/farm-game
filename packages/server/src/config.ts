@@ -13,6 +13,24 @@ export interface ServerConfig {
   host: string;
   env: 'development' | 'production' | 'test';
 
+  /** Realtime WS entry (Colyseus) — independent process from HTTP. */
+  wsPort: number;
+  wsHost: string;
+
+  /**
+   * Redis connection for the Colyseus matchmaker directory + presence across
+   * WS processes. Null → single-process LocalDriver (development only;
+   * production MUST set REDIS_URL — the WS entry refuses to boot without it).
+   */
+  redisUrl: string | null;
+
+  /**
+   * Farm room ownership lease (PostgreSQL-arbitrated). The lease must
+   * outlive the renew interval with comfortable margin for GC pauses.
+   */
+  leaseTtlMs: number;
+  leaseRenewMs: number;
+
   /** Main business database (MikroORM). Phase 1 unused; placeholder. */
   mainDbUrl: string | null;
   /** @colyseus/database connection. Phase 2 enabled. */
@@ -68,6 +86,26 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   const enableAdmin = process.env.ENABLE_ADMIN === '1';
   const enableMockAuth = process.env.ENABLE_MOCK_AUTH === '1';
 
+  // Realtime WS entry (G2 T2).
+  const wsPort = Number(process.env.WS_PORT ?? '2567');
+  const wsHost = process.env.WS_HOST ?? '127.0.0.1';
+  const redisUrl = process.env.REDIS_URL || null;
+  const leaseTtlMs = Number(process.env.LEASE_TTL_MS ?? '15000');
+  const leaseRenewMs = Number(process.env.LEASE_RENEW_MS ?? '5000');
+  if (!Number.isFinite(wsPort) || wsPort <= 0) {
+    throw new ConfigError(`WS_PORT must be a positive integer (received ${process.env.WS_PORT ?? '<unset>'}).`);
+  }
+  if (!Number.isFinite(leaseTtlMs) || leaseTtlMs <= 0 || !Number.isFinite(leaseRenewMs) || leaseRenewMs <= 0) {
+    throw new ConfigError(
+      `LEASE_TTL_MS and LEASE_RENEW_MS must be positive integers (received ${process.env.LEASE_TTL_MS ?? '<unset>'} / ${process.env.LEASE_RENEW_MS ?? '<unset>'}).`,
+    );
+  }
+  if (leaseRenewMs >= leaseTtlMs) {
+    throw new ConfigError(
+      `LEASE_RENEW_MS (${leaseRenewMs}) must be shorter than LEASE_TTL_MS (${leaseTtlMs}) or leases expire between renewals.`,
+    );
+  }
+
   // Fail-closed production validation (ADR-0001 §4).
   if (env === 'production') {
     const checks: Array<[string, string, string]> = [
@@ -108,10 +146,22 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     console.warn(`[config] HOST=0.0.0.0 exposes the server on all interfaces; restrict via HOST in production`);
   }
 
+  // Production: the WS entry must share farm state across processes via
+  // Redis — a LocalDriver deployment silently breaks matchmaking between
+  // replicas (G2 plan: "Redis 启动不可达 → readiness 不通过，不回退").
+  if (env === 'production' && !redisUrl) {
+    throw new ConfigError('REDIS_URL must be set explicitly in production (multi-process WS matchmaking).');
+  }
+
   return {
     port,
     host,
     env,
+    wsPort,
+    wsHost,
+    redisUrl,
+    leaseTtlMs,
+    leaseRenewMs,
     mainDbUrl: process.env.MAIN_DB_URL ?? null,
     adminDbUrl: process.env.ADMIN_DB_URL ?? null,
     jwtSecret,

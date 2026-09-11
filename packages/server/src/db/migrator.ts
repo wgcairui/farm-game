@@ -81,30 +81,52 @@ export interface ApplyResult {
 }
 
 /**
+ * Session-level advisory lock key for migration mutual exclusion (G2 T2).
+ * The HTTP and WS entries both apply migrations at boot; two processes
+ * racing `CREATE TABLE` on a fresh database would fail spuriously. Any
+ * constant works as long as every migration runner agrees — this one spells
+ * 'farm' in hex.
+ */
+const MIGRATION_ADVISORY_LOCK_KEY = 0x6661726d;
+
+async function withMigrationLock<T>(client: Client, fn: () => Promise<T>): Promise<T> {
+  await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_ADVISORY_LOCK_KEY]);
+  try {
+    return await fn();
+  } finally {
+    await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_ADVISORY_LOCK_KEY]);
+  }
+}
+
+/**
  * Apply pending migrations against the given PostgreSQL URL.
  *
  * Idempotent — running it against an already-migrated database is a no-op.
- * Throws on the first migration that fails; subsequent migrations are NOT
- * attempted (the caller may re-run after fixing the cause).
+ * Guarded by a PostgreSQL advisory lock so concurrent boot entries (HTTP +
+ * WS processes) serialise instead of racing DDL. Throws on the first
+ * migration that fails; subsequent migrations are NOT attempted (the caller
+ * may re-run after fixing the cause).
  */
 export async function applyPendingMigrations(dbUrl: string): Promise<ApplyResult> {
   const client = new Client({ connectionString: dbUrl });
   await client.connect();
   try {
     await ensureTrackingTable(client);
-    const migrations = loadMigrations();
-    const done = await appliedMigrations(client);
-    const applied: string[] = [];
-    const skipped: string[] = [];
-    for (const m of migrations) {
-      if (done.has(m.name)) {
-        skipped.push(m.name);
-        continue;
+    return await withMigrationLock(client, async () => {
+      const migrations = loadMigrations();
+      const done = await appliedMigrations(client);
+      const applied: string[] = [];
+      const skipped: string[] = [];
+      for (const m of migrations) {
+        if (done.has(m.name)) {
+          skipped.push(m.name);
+          continue;
+        }
+        await applyOne(client, m);
+        applied.push(m.name);
       }
-      await applyOne(client, m);
-      applied.push(m.name);
-    }
-    return { applied, skipped };
+      return { applied, skipped };
+    });
   } finally {
     await client.end();
   }
@@ -116,16 +138,18 @@ export async function rollbackLastMigration(dbUrl: string): Promise<string | nul
   await client.connect();
   try {
     await ensureTrackingTable(client);
-    const done = await appliedMigrations(client);
-    const migrations = loadMigrations();
-    for (let i = migrations.length - 1; i >= 0; i -= 1) {
-      const m = migrations[i]!;
-      if (done.has(m.name)) {
-        await rollbackOne(client, m);
-        return m.name;
+    return await withMigrationLock(client, async () => {
+      const done = await appliedMigrations(client);
+      const migrations = loadMigrations();
+      for (let i = migrations.length - 1; i >= 0; i -= 1) {
+        const m = migrations[i]!;
+        if (done.has(m.name)) {
+          await rollbackOne(client, m);
+          return m.name;
+        }
       }
-    }
-    return null;
+      return null;
+    });
   } finally {
     await client.end();
   }
