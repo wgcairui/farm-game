@@ -14,7 +14,7 @@ import { LockMode } from '@mikro-orm/core';
 import { Plot } from '../../db/entities/Plot.js';
 import { Player } from '../../db/entities/Player.js';
 import { hashRequestBody, loadReceipt, persistReceipt } from './receipts.js';
-import { failure, success, type CommandOutcome } from './outcome.js';
+import { failure, replayedFailure, replayedSuccess, success, type CommandOutcome } from './outcome.js';
 import { derivePlotStatus } from './plot-state.js';
 
 export interface PlantArgs {
@@ -29,8 +29,31 @@ export async function plantCommand(args: PlantArgs): Promise<CommandOutcome<Farm
   const { em, playerId, operationId, body, serverNow } = args;
   const requestHash = hashRequestBody(body);
 
-  const replayed = await loadReceipt<FarmPlantPayload>(em, playerId, operationId, requestHash);
-  if (replayed) return replayed;
+  // Lock the player row first so concurrent plant/water/harvest on the same
+  // player serialise. Using `lockMode: PESSIMISTIC_WRITE` on `findOne` issues
+  // `SELECT ... FOR UPDATE` in a single round-trip; the old two-step
+  // (findOne → em.lock) was racy because two transactions could read the
+  // same row before either held the lock.
+  const player = await em.findOne(
+    Player,
+    { playerId },
+    { lockMode: LockMode.PESSIMISTIC_WRITE },
+  );
+  if (!player) {
+    return persistReceipt({
+      em, playerId, operationId, command: 'plant', requestHash, serverNow,
+      outcome: failure<FarmPlantPayload>(ErrorCode.NOT_AUTHENTICATED, 'player row missing'),
+    });
+  }
+
+  const replayed = await loadReceipt<FarmPlantPayload>(
+    em, playerId, operationId, 'plant', requestHash,
+  );
+  if (replayed) {
+    return replayed.outcome.ok
+      ? replayedSuccess<FarmPlantPayload>(replayed.outcome.payload, replayed.outcome.revision)
+      : replayedFailure<FarmPlantPayload>(replayed.outcome.code, replayed.outcome.message);
+  }
 
   if (!Number.isInteger(body.plotIndex) || body.plotIndex < 0 || body.plotIndex > 23) {
     return persistReceipt({
@@ -45,9 +68,6 @@ export async function plantCommand(args: PlantArgs): Promise<CommandOutcome<Farm
       outcome: failure<FarmPlantPayload>(ErrorCode.CROP_UNKNOWN, 'unknown cropId'),
     });
   }
-
-  const player = await em.findOneOrFail(Player, { playerId });
-  await em.lock(player, LockMode.PESSIMISTIC_WRITE);
 
   const plot = await em.findOne(Plot, { playerId, index: body.plotIndex });
   if (!plot) {

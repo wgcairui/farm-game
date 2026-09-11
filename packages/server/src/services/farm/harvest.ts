@@ -15,7 +15,7 @@ import { LockMode } from '@mikro-orm/core';
 import { Plot } from '../../db/entities/Plot.js';
 import { Player } from '../../db/entities/Player.js';
 import { hashRequestBody, loadReceipt, persistReceipt } from './receipts.js';
-import { failure, success, type CommandOutcome } from './outcome.js';
+import { failure, replayedFailure, replayedSuccess, success, type CommandOutcome } from './outcome.js';
 import { derivePlotStatus } from './plot-state.js';
 
 export interface HarvestArgs {
@@ -30,8 +30,26 @@ export async function harvestCommand(args: HarvestArgs): Promise<CommandOutcome<
   const { em, playerId, operationId, body, serverNow } = args;
   const requestHash = hashRequestBody(body);
 
-  const replayed = await loadReceipt<FarmHarvestPayload>(em, playerId, operationId, requestHash);
-  if (replayed) return replayed;
+  const player = await em.findOne(
+    Player,
+    { playerId },
+    { lockMode: LockMode.PESSIMISTIC_WRITE },
+  );
+  if (!player) {
+    return persistReceipt({
+      em, playerId, operationId, command: 'harvest', requestHash, serverNow,
+      outcome: failure<FarmHarvestPayload>(ErrorCode.NOT_AUTHENTICATED, 'player row missing'),
+    });
+  }
+
+  const replayed = await loadReceipt<FarmHarvestPayload>(
+    em, playerId, operationId, 'harvest', requestHash,
+  );
+  if (replayed) {
+    return replayed.outcome.ok
+      ? replayedSuccess<FarmHarvestPayload>(replayed.outcome.payload, replayed.outcome.revision)
+      : replayedFailure<FarmHarvestPayload>(replayed.outcome.code, replayed.outcome.message);
+  }
 
   if (!Number.isInteger(body.plotIndex) || body.plotIndex < 0 || body.plotIndex > 23) {
     return persistReceipt({
@@ -39,9 +57,6 @@ export async function harvestCommand(args: HarvestArgs): Promise<CommandOutcome<
       outcome: failure<FarmHarvestPayload>(ErrorCode.PLOT_NOT_OWNED, 'plotIndex out of range'),
     });
   }
-
-  const player = await em.findOneOrFail(Player, { playerId });
-  await em.lock(player, LockMode.PESSIMISTIC_WRITE);
 
   const plot = await em.findOne(Plot, { playerId, index: body.plotIndex });
   if (!plot) {

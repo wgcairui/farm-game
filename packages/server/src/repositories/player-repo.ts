@@ -33,6 +33,22 @@ export class IdentityAlreadyBoundError extends Error {
 export interface PlayerRepo {
   /** Find a player bound to the given provider identity. */
   findByIdentity(identity: Pick<AuthIdentity, 'provider' | 'subject' | 'tenantId'>): Promise<PlayerSave | null>;
+  /**
+   * Atomically return the existing player for `(provider, subject, tenantId)`,
+   * or create a fresh one seeded by `createSave` and bind the identity.
+   *
+   * Replaces the old `ensurePlayer` two-step (`findByIdentity → upsert →
+   * addIdentity`) which raced on concurrent first logins: both transactions
+   * saw no existing identity, both created a player, and the second one's
+   * `addIdentity` then collided on the unique constraint — producing an
+   * orphan player and a 500. This entry point keeps the player create +
+   * identity bind in a single transaction with `ON CONFLICT` semantics on
+   * the auth_identities unique index.
+   */
+  getOrCreateByIdentity(
+    identity: Pick<AuthIdentity, 'provider' | 'subject' | 'tenantId'>,
+    createSave: (playerId: string) => PlayerSave,
+  ): Promise<PlayerSave>;
   /** Insert or update the player record. Test/seed helper. */
   upsert(save: PlayerSave): Promise<PlayerSave>;
   /** Find by internal playerId. */
@@ -64,9 +80,7 @@ export function generatePlayerId(): string {
 
 /**
  * Get-or-create a player for the given identity. Used by `/auth/wechat` and
- * `/auth/oauth`; the in-memory implementation calls into the test repo and
- * the production implementation runs the equivalent upsert under a
- * transaction.
+ * `/auth/oauth`; delegates the atomic create+bind to `repo.getOrCreateByIdentity`.
  *
  * If `createSave` is omitted, the player is bootstrapped with
  * `createDefaultPlayerSave({ playerId })` (6 unlocked plots, 200 gold).
@@ -78,22 +92,9 @@ export async function ensurePlayer(
   identity: Pick<AuthIdentity, 'provider' | 'subject' | 'tenantId'>,
   createSave?: (playerId: string) => PlayerSave,
 ): Promise<PlayerSave> {
-  const existing = await repo.findByIdentity(identity);
-  if (existing) return existing;
-  const playerId = generatePlayerId();
-  const save = createSave
-    ? createSave(playerId)
-    : createDefaultPlayerSave({ playerId });
-  await repo.upsert(save);
-  await repo.addIdentity(playerId, {
-    provider: identity.provider,
-    subject: identity.subject,
-    tenantId: identity.tenantId,
-    boundAt: Date.now(),
-  });
-  const final = await repo.findByPlayerId(playerId);
-  if (!final) throw new Error('ensurePlayer: race produced no player');
-  return final;
+  return repo.getOrCreateByIdentity(identity, (playerId) =>
+    createSave ? createSave(playerId) : createDefaultPlayerSave({ playerId }),
+  );
 }
 
 // Re-export AuthIdentitySummary so existing imports keep working.

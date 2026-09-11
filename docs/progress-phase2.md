@@ -141,3 +141,58 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 
 - `pnpm --filter @farm-game/server test:integration`（真实 PG 集成）：本轮 core 升级未触及 PG 路径，但下次跑 PG 时必须先重跑以确认依赖更新未影响集成测试。
 - 升级 `@colyseus/admin` / `@colyseus/auth` / `@colyseus/database` 与 core 同步：本轮保持原版本（peer check 通过），T2 接入 Redis Presence/Driver 时若引入 transport/auth 再统一升级。
+
+---
+
+## 7. T1 落地（统一命令入口 + 幂等并发 + 快照修订 + 认证 fail-closed）
+
+> 起点：G0/G0.5/G1 已落地；T0 完成 Colyseus 0.18 server 可启动与 WS upgrade 接受。本节在不动业务规则的前提下，把 HTTP/WS 共用的命令执行路径加固到可承接 G2 实时房间。
+
+### 7.1 主要改动
+
+**协议与共享层**
+
+- 新增 `ErrorCode.OPERATION_ID_REUSED = 3007`；`farm/routes.ts` 业务错误映射增加该码 → 409。
+- `CommandResponse` 新增可选字段 `operationRevision?: number | null` 与 `replayed?: boolean`。`revision` 仍是当前快照修订；`operationRevision` 是收据结算时的修订；`replayed` 表示本次响应来自持久化收据。
+- `CommandOutcome` 新增内部 `_replayed` 标志位，由 `replayedSuccess` / `replayedFailure` 工厂注入；不进 HTTP/WS payload，仅供 `executeCommand` 投影 `ExecuteResult.replayed`。
+
+**执行路径（`services/farm/`）**
+
+- `execute.ts`：`ExecuteResult` 携带 `operationRevision: number | null` 与 `replayed: boolean`；`materialisePlayer` 仍在事务内单事务读出最新 player。
+- `receipts.ts`：`loadReceipt` 现在同时校验 `command` 与 `requestHash`。任一不一致返回 `OPERATION_ID_REUSED`，不再误把 `water(plot 0)` 和 `harvest(plot 0)` 当成同一命令的回放。返回值改为 `{ outcome, replayed: true }` 元组，由 service 投影为 `_replayed` 标志。
+- `plant / water / harvest / unlock`：把两步 `findOneOrFail + em.lock` 改成单次 `findOne(Player, …, { lockMode: PESSIMISTIC_WRITE })`，发出一条 `SELECT ... FOR UPDATE`，避免两事务读到同一行再竞争加锁。锁在 receipt 查询之前，确保同 operationId 的并发请求串行化在 player 行上。`player` 不存在时返回 `NOT_AUTHENTICATED` 失败收据，不再让 `findOneOrFail` 抛 500。
+
+**仓储（`repositories/`）**
+
+- `PlayerRepo` 接口新增 `getOrCreateByIdentity(identity, createSave)`：原 `ensurePlayer` 的两步 `findByIdentity → upsert → addIdentity` 在并发首次登录时会留下孤儿 player + 抛 500。新入口在 PG 实现里走单事务：`SELECT identity` 命中则读出 player；未命中则 INSERT player + 24 plots + INSERT identity，依赖 `auth_identities` UNIQUE 约束兜底竞态——并发 loser 收到 `IdentityAlreadyBoundError`，调用方可安全重试。
+- `MikroORMPlayerRepo.materialisePlayer`：现在用 `derivePlotStatus` + 当前时间推导每个 plot 的 `status`，不再直接读 `Plot.status`。`growing → ripe` 是时间驱动转换（ADR-0003 D23），重启后必须仍可见。
+- InMemory 实现同步加上 `getOrCreateByIdentity`（单线程，无需并发控制）。
+
+**认证（`auth/routes.ts`）**
+
+- `production` 模式下，非 `mock_` 前缀的 `wechat code` / `oauth idToken` / `bind token` 一律 403 拒绝并返回 `WECHAT_CODE_INVALID` / `OAUTH_PROVIDER_INVALID`。**真实微信/OAuth 验签仍待 G1.5 接入；本轮只是堵住“裸字符串 → 默认 mock subject”的安全漏洞**。`dev` / `test` 模式下保留旧 stub 行为并增加一条 `WARN` 日志。
+
+**集成测试（`test/integration/farm-flow.test.ts`）**
+
+- PG 不可达时不再 silent skip——打印明确错误并将 `process.exitCode = 1`，避免“未执行”被当成“已通过”。
+- `skip()` 改为 `requireDb()` 断言；任何依赖 DB 的测试用例若环境未就绪都失败。
+- 新增场景：
+  - 同 operationId 改 body：断言 `code === OPERATION_ID_REUSED`（不再依赖“返回 ok:false”）。
+  - 同 operationId 跨命令（`water(plot 0)` → `harvest(plot 0)`）：断言 `OPERATION_ID_REUSED`，避免之前因 hash 一致被误当成 water 回放。
+  - 同 operationId 重复 `plant`：断言 `replayed === true` 且 `operationRevision === operationRevision`（与首次相同）。
+  - 并发首次登录：两个并发 `loginWeChat` 收到同一 `code`，断言 `auth_identities` 中只插入一行（不再有孤儿 player）。
+
+### 7.2 验证矩阵
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测（不含集成） | ✅ 66/66（shared 31 + server 23 + client-mini 5 + client-app 7） |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13（既有记录未退化） |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG | **本机未运行**（无 docker / 未启动 `pnpm db:up`）。下一阶段 T2 之前必须重跑一次以确认 T1 未引入回归。 |
+
+### 7.3 已知风险与下阶段要求
+
+- 真实 PG 集成测试在本次提交中未运行；T2 commit 之前必须 `pnpm db:up && pnpm db:migrate:test && pnpm test:integration` 跑一遍 8/8 全绿。
+- 业务错误码 `OPERATION_ID_REUSED` 已加入 `packages/shared`，下次升级协议 major 时需记录。
+- `auth/routes.ts` 的 production fail-closed 改变了 prod 默认行为——任何依赖“裸字符串即可登录”的内部脚本会失效。如有内部脚本依赖 stub 登录，必须改用 `mock_` 前缀并 `ENABLE_MOCK_AUTH=1`。

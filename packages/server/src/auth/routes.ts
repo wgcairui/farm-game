@@ -112,9 +112,28 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
     async (req, reply): Promise<ApiResponse<LoginResponse>> => {
       const { code, guestPlayerId } = req.body;
 
-      if (code.startsWith(MOCK_CODE_PREFIX) && !app.config.enableMockAuth) {
+      if (code.startsWith(MOCK_CODE_PREFIX)) {
+        if (!app.config.enableMockAuth) {
+          reply.code(403);
+          return { ok: false, code: ErrorCode.WECHAT_CODE_INVALID, message: 'mock login disabled' };
+        }
+      } else if (app.config.env === 'production') {
+        // T1 (G0 close): non-mock `code` values are not yet verified against
+        // `api.weixin.qq.com/sns/jscode2session`. Production refuses them
+        // rather than silently minting a subject from the raw string —
+        // accepting an unverified code would let any caller impersonate an
+        // arbitrary WeChat user (M1 / ADR-0001 §4 fail-closed). Real
+        // verification is wired in G1.5; until then dev/test continue to
+        // accept non-mock codes through the same `mock_<first16>` fallback
+        // used by OAuth.
         reply.code(403);
-        return { ok: false, code: ErrorCode.WECHAT_CODE_INVALID, message: 'mock login disabled' };
+        return {
+          ok: false,
+          code: ErrorCode.WECHAT_CODE_INVALID,
+          message: 'real wechat login not yet wired; use mock_ codes in non-production',
+        };
+      } else {
+        app.log.warn({ codePrefix: code.slice(0, 4) }, 'wechat code accepted in stub mode (non-mock, non-production)');
       }
 
       const subject = code.startsWith(MOCK_CODE_PREFIX) ? code : `mock_${code.slice(0, 16)}`;
@@ -138,20 +157,23 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
       const { provider, idToken } = req.body;
       const isMock = idToken.startsWith(MOCK_CODE_PREFIX);
 
-      if (isMock && !app.config.enableMockAuth) {
+      if (isMock) {
+        if (!app.config.enableMockAuth) {
+          reply.code(403);
+          return { ok: false, code: ErrorCode.OAUTH_PROVIDER_INVALID, message: 'mock login disabled' };
+        }
+      } else if (app.config.env === 'production') {
+        // T1: refuse non-mock idTokens in production. Apple/Google id_token
+        // signature verification lands in G1.5; until then accepting the raw
+        // string would let any caller impersonate any Apple/Google subject.
         reply.code(403);
-        return { ok: false, code: ErrorCode.OAUTH_PROVIDER_INVALID, message: 'mock login disabled' };
-      }
-
-      // Non-mock OAuth tokens are still accepted in G0 because the real
-      // Apple/Google/WeChat id_token verification is not yet wired. Log a
-      // single warning per process so misconfigured production deployments
-      // are visible without being noisy (M1).
-      if (!isMock && app.config.env === 'production') {
-        app.log.warn(
-          { provider },
-          'oauth login accepted in stub mode (no provider verification); replace with real verification in G1',
-        );
+        return {
+          ok: false,
+          code: ErrorCode.OAUTH_PROVIDER_INVALID,
+          message: 'real oauth verification not yet wired; use mock_ codes in non-production',
+        };
+      } else {
+        app.log.warn({ provider }, 'oauth idToken accepted in stub mode (non-mock, non-production)');
       }
 
       const subject = isMock ? idToken : `mock_${provider}_${idToken.slice(0, 16)}`;
@@ -179,9 +201,20 @@ export async function authRoutes(app: FastifyInstance, deps: AuthRoutesDeps): Pr
 
       const { provider, token, tenantId } = req.body;
       const isMock = token.startsWith(MOCK_CODE_PREFIX);
-      if (isMock && !app.config.enableMockAuth) {
+      if (isMock) {
+        if (!app.config.enableMockAuth) {
+          reply.code(403);
+          return { ok: false, code: ErrorCode.OAUTH_PROVIDER_INVALID, message: 'mock bind disabled' };
+        }
+      } else if (app.config.env === 'production') {
         reply.code(403);
-        return { ok: false, code: ErrorCode.OAUTH_PROVIDER_INVALID, message: 'mock bind disabled' };
+        return {
+          ok: false,
+          code: ErrorCode.OAUTH_PROVIDER_INVALID,
+          message: 'real oauth verification not yet wired; use mock_ codes in non-production',
+        };
+      } else {
+        app.log.warn({ provider }, 'bind token accepted in stub mode (non-mock, non-production)');
       }
       const subject = isMock ? token : `mock_${provider}_${token.slice(0, 16)}`;
 

@@ -14,7 +14,7 @@ import {
   type AuthIdentitySummary,
   type PlayerSave,
 } from '@farm-game/shared';
-import { IdentityAlreadyBoundError, type PlayerRepo } from './player-repo.js';
+import { generatePlayerId, IdentityAlreadyBoundError, type PlayerRepo } from './player-repo.js';
 
 export class InMemoryPlayerRepo implements PlayerRepo {
   private readonly _byId = new Map<string, PlayerSave>();
@@ -26,6 +26,29 @@ export class InMemoryPlayerRepo implements PlayerRepo {
     const playerId = this._byIdentity.get(key);
     if (!playerId) return null;
     return this._byId.get(playerId) ?? null;
+  }
+
+  async getOrCreateByIdentity(
+    identity: Pick<AuthIdentity, 'provider' | 'subject' | 'tenantId'>,
+    createSave: (playerId: string) => PlayerSave,
+  ): Promise<PlayerSave> {
+    // In-memory repo runs on a single event-loop tick so there's no
+    // concurrency; the lookup-then-insert sequence is atomic enough for
+    // tests.
+    const existing = await this.findByIdentity(identity);
+    if (existing) return existing;
+    const playerId = generatePlayerId();
+    const save = createSave(playerId);
+    await this.upsert(save);
+    await this.addIdentity(playerId, {
+      provider: identity.provider,
+      subject: identity.subject,
+      tenantId: identity.tenantId,
+      boundAt: Date.now(),
+    });
+    const final = await this.findByPlayerId(playerId);
+    if (!final) throw new Error('getOrCreateByIdentity: race produced no player');
+    return final;
   }
 
   async findByPlayerId(playerId: string): Promise<PlayerSave | null> {

@@ -171,7 +171,17 @@ export async function farmRoutes(app: FastifyInstance, deps: FarmRoutesDeps): Pr
 
 function projectResponse<TPayload>(
   reply: import('fastify').FastifyReply,
-  result: { ok: boolean; code?: ErrorCode; message?: string; payload?: TPayload; revision: number; serverNow: number; player: import('@farm-game/shared').PlayerSave },
+  result: {
+    ok: boolean;
+    code?: ErrorCode;
+    message?: string;
+    payload?: TPayload;
+    revision: number;
+    operationRevision: number | null;
+    replayed: boolean;
+    serverNow: number;
+    player: import('@farm-game/shared').PlayerSave;
+  },
   meta: { operationId: string },
 ): ApiResponse<CommandResponse<TPayload>> {
   if (!result.ok) {
@@ -182,6 +192,8 @@ function projectResponse<TPayload>(
     operationId: meta.operationId,
     serverNow: result.serverNow,
     revision: result.revision,
+    operationRevision: result.operationRevision,
+    replayed: result.replayed,
     player: result.player,
     ...(result.payload !== undefined ? { payload: result.payload } : {}),
   };
@@ -195,6 +207,7 @@ function businessHttpStatus(code: ErrorCode | undefined): number {
     case ErrorCode.PLOT_NOT_EMPTY:
     case ErrorCode.CROP_NOT_RIPE:
     case ErrorCode.WATER_LIMIT_REACHED:
+    case ErrorCode.OPERATION_ID_REUSED:
       return 409;
     case ErrorCode.INSUFFICIENT_GOLD:
       return 402;
