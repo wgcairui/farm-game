@@ -225,3 +225,6 @@ export { makeOperationId } from './net/index.js';
 // OnlineGameApp emits lifecycle/gameplay events on the shared global bus —
 // the Cocos UI subscribes to the same bus instead of an per-app .on().
 export { EventBus, GameEvent } from '@farm-game/shared';
+// Static crop catalog for the seed-picker dialog (implementation-plan-ui-v13.md U07).
+export { CROPS, getCrop } from '@farm-game/shared';
+export type { CropConfig } from '@farm-game/shared';

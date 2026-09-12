@@ -3,6 +3,7 @@
 > 目标读者：拿到这台 Mac 的开发者，从零跑通「**登录 → 种植 → 收获**」的最小联调闭环。
 > 范围：MVP 联调最小路径，**不做** sprite 动画、图集、UI 美化、`.scene` 手写 JSON、自动构建脚本。
 > 配套策略文档：[`cocos-integration.md`](./cocos-integration.md)（讲「为什么」，本文件讲「怎么照做」）。
+> **2026-09-12 更新**：§4–§5 的最小场景已被 [implementation-plan-ui-v13.md](./implementation-plan-ui-v13.md) 的完整 UI（v13 素材 + 分层场景）取代；§11 补记 UI 时代的构建链增量、AppID 坑与自动化 E2E。
 
 ---
 
@@ -486,3 +487,39 @@ A: 正常（见 §5.3 + §8）。先 `Cmd+S` 保存场景，编辑器顶部「�
 **已验证的构建链**（改任何客户端/shared 代码后按此顺序）：`pnpm --filter @farm-game/shared build` → `pnpm --filter @farm-game/client-mini build:cocos` → CocosCreator CLI `--build "platform=wechatgame;debug=true;startScene=1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"` → patch urlCheck=false → DevTools「编译」。
 
 **验收基线（2026-09-12）**：登录 → join → 种胡萝卜（−10 金）→ 30s → 收获（+25 金）→ DB `players.gold/revision` 与 `plots.status` 全程一致；重编译后同玩家状态保留。console 应出现 `[wx-compat] installed guard=true send=true` 与 `[OnlineFarm] 已连接服务端`，无业务红字（DevTools 自身的 `webapi_getwxaasyncsecinfo:fail` 是工具噪音，可忽略）。
+
+---
+
+## 11. UI v13 时代的构建链与自动化 E2E（2026-09-12 补记）
+
+### 11.1 素材管线
+
+- `resources/game/` 现为**纯生成目录**：由仓库根 `scripts/prepare-cocos-assets.py` 从 `assets/sprites/v13/`（82 件，批次 A–H）缩放/量化后重建，幂等可重跑，体积报告在 `resources/game/prepare-report.json`（当前 1.78MB）。**不要手工往里放图**。
+- `overlay_selected.png` 被 v13 素材管线**排除**（实为沙堆误图，含键控残留）；选中框由 `farm/widgets.ts selectionRing()` 程序化绘制。
+- 场景几何唯一来源：`assets/scripts/farm/layout.ts`（720×1280 Fit-Height、中心原点坐标、Widget 规格、D–G 场景层开关）。
+
+### 11.2 构建链（不变 + 一步 patch）
+
+```
+pnpm --filter @farm-game/shared build            # vendor bundle 吃 dist/
+pnpm --filter @farm-game/client-mini build:cocos # assets/scripts/vendor/farm-online.js
+/Applications/CocosCreator.app/Contents/MacOS/CocosCreator --project \
+  /Users/cairui/Code/farm-game/packages/client-mini \
+  --build "platform=wechatgame;debug=true;startScene=1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+# 构建后两个 patch（都因为构建产物被重置）：
+#   project.config.json: urlCheck=false；appid=touristappid（见 §11.3）
+```
+
+构建期出现一条 `Missing class: 6f4c2oeiz1MWaLnnwscLT5P` 警告是 builder 统计阶段的库缓存噪音（压缩 uuid 即 OnlineFarm 组件），产物中已正确注册，可忽略。
+
+### 11.3 AppID 坑（2026-09-12 实战）
+
+- Cocos 构建产物会把 `project.config.json#appid` 写成历史残留值（本机出现过 `wx6ac3f5090a6b99c5`）。该 AppID 不属于当前登录账号时，`cli open/auto` 报 **`不存在此 AppID 请检查后重新输入 (code 10)`**，项目窗口根本不打开，且 CLI 退出码为 0、只有 stderr 里有 `[error]`——**极易误判为打开成功**。
+- 解法：构建后把 appid patch 成官方测试号 **`touristappid`**（模拟器足够；真机才需要正式 AppID）。
+
+### 11.4 自动化 E2E（headless 联调验收）
+
+- `scripts/farm-sim-e2e.mjs`：连/拉起 IDE（automator launch，端口 9421）→ console 基线断言 → `globalThis.__farm.actions` 驱动 种→浇→收→解锁 → 每步 psql 断言 → 截图 `/tmp/farm-sim-home.png`。
+- `scripts/farm-sim-probe.mjs`：自动化诊断探针（launch → 3 分钟轮询后端连接 → evaluate）。判定标准：**模拟器真正跑起来的唯一铁证是 wechatweb 进程与 2567 端口建立 ESTABLISHED**；IDE 的 `✔ auto` / `checkVersion` 通过都只代表 IDE 层。
+- 已知边界（2026-09-12）：CLI/automator 全流程在**无人值守**环境下卡在「模拟器窗口不编译」——launch/checkVersion 正常但 simulator 零 console、零连接（疑似首启 GUI 弹窗阻塞，需人眼看一次窗口）。人工打开 IDE 确认弹窗后，自动化路径即可恢复。
+- automator 的 `mini.evaluate` 需要游戏 context 存活；`automator` 内部有 background rejection，脚本需挂 `process.on('unhandledRejection')` 兜底（两脚本均已挂）。

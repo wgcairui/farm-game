@@ -1,99 +1,183 @@
 /**
- * OnlineFarm — G3 联调最小 UI（程序化搭建，场景里只挂这一个组件）。
+ * OnlineFarm — home page root component (implementation-plan-ui-v13.md U02–U08,
+ * U10–U14). The scene stays minimal: Canvas + this component only; every node
+ * is built here at runtime.
  *
- * 职责：
- *  - 启动 OnlineGameApp（固定 mock code，保证重开模拟器是同一玩家）
- *  - 程序化生成：顶部金币/状态 Label、6×4 地块网格（resources 加载贴图）
- *  - 点击地块：empty → plant(carrot)、growing → water、可收获 → harvest
- *  - 每秒按服务端时钟刷新生长阶段贴图（stage-1..4）
+ * Responsibilities:
+ *  - apply the 720×1280 Fit-Height design resolution before anything mounts
+ *  - boot OnlineGameApp (fixed mock code → same player across recompiles)
+ *  - build MapRoot (mapLayer) + ScreenUI (hud / sideColumn / bottomBar /
+ *    dialogs / toast) and the FxPlayer, all consuming preloaded v13 frames
+ *  - route plot taps to semantic actions (plant picker / water / harvest /
+ *    unlock confirm) — zero local rules, server stays authoritative (D4)
+ *  - drive per-frame modules (fx / toast / dialogs / water) from update(dt)
+ *    and the 1s countdown tick + 30s clock from schedules
  *
- * 这是联调最小 UI，不是最终视觉；美化/动画/引导全部留给 Phase 4。
+ * Console baselines the E2E greps (keep byte-identical, runbook §10):
+ *   [wx-compat] installed guard=true send=true   (from the vendor bundle)
+ *   [OnlineFarm] 已连接服务端
  */
-import {
-  _decorator, Component, Node, Sprite, SpriteFrame, Label, UITransform,
-  Color, Layers, resources, view, Vec3,
-} from 'cc';
+
+import { Color, Label, Node, Vec3, view, _decorator } from 'cc';
 import {
   OnlineGameApp, EventBus, GameEvent,
-  type OnlineState, type OnlinePlotView, type OnlinePlotView as PlotView,
+  type OnlineState, type OnlinePlotView,
 } from './vendor/farm-online.js';
+import {
+  SKY_COLOR, applyDesignResolution, applyWidget, loadPlotLayout,
+} from './farm/layout';
+import { makeLabel, roundRect, sizedNode } from './farm/widgets';
+import { MapLayer } from './farm/mapLayer';
+import { Hud } from './farm/hud';
+import { SideColumn } from './farm/sideColumn';
+import { BottomBar } from './farm/bottomBar';
+import { DialogLayer } from './farm/dialogs';
+import { ToastLayer } from './farm/toast';
+import { FxPlayer } from './farm/fx';
+import type { PlotAction } from './farm/plotView';
 
 const { ccclass } = _decorator;
 
-const COLUMNS = 6;
-const ROWS = 4;
-const PLOT_COUNT = COLUMNS * ROWS;
-const DEFAULT_CROP = 'carrot';
 /** 固定 mock code：模拟器重启/重编译后仍登录同一玩家，验收「状态保留」。 */
 const MOCK_CODE = 'mock_dev_cocos_simulator';
 
-type SpriteMap = Record<string, SpriteFrame>;
+const BASE_URL = 'http://127.0.0.1:3000';
+const WS_ENDPOINT = 'ws://127.0.0.1:2567';
+
+interface FarmGlobal {
+  app: OnlineGameApp | null;
+  state: () => OnlineState | null;
+  actions: {
+    plant: (plotIndex: number, cropId: string) => Promise<void>;
+    water: (plotIndex: number) => Promise<void>;
+    harvest: (plotIndex: number) => Promise<void>;
+    unlock: (plotIndex: number) => Promise<void>;
+  };
+}
 
 @ccclass('OnlineFarm')
 export class OnlineFarm extends Component {
   private app: OnlineGameApp | null = null;
   private started = false;
-  private frames: SpriteMap = {};
-  private plotNodes: Node[] = [];
-  private goldLabel: Label | null = null;
+
+  private mapLayer: MapLayer | null = null;
+  private hud: Hud | null = null;
+  private sideColumn: SideColumn | null = null;
+  private bottomBar: BottomBar | null = null;
+  private dialogs: DialogLayer | null = null;
+  private toast: ToastLayer | null = null;
+  private fx: FxPlayer | null = null;
+
   private statusLabel: Label | null = null;
-  private tipLabel: Label | null = null;
+  private loadingCover: Node | null = null;
+  /** Plot that opened the seed picker / unlock dialog. */
+  private pendingPlot = -1;
+  private greeted = false;
 
-  private onCoins: ((gold: number) => void) | null = null;
-  private onPlot: ((index: number) => void) | null = null;
-  private onConn: ((connected: boolean) => void) | null = null;
+  private offEvents: Array<() => void> = [];
 
-  async onLoad() {
-    this.buildUi();
-    this.setStatus('加载贴图…');
+  async onLoad(): Promise<void> {
+    // U02 — design resolution first so every later Widget measures correctly.
+    applyDesignResolution();
+    this.buildLoadingCover();
+    this.buildStatusLabels();
+
     try {
-      this.frames = await this.loadFrames();
+      await this.boot();
     } catch (err) {
-      this.setStatus(`贴图加载失败: ${String((err as Error).message)}（检查 assets/resources/game）`);
-      return;
+      this.setStatus(`加载失败: ${String((err as Error).message).slice(0, 60)}`);
+      // eslint-disable-next-line no-console
+      console.error('[OnlineFarm] boot failed', err);
     }
+
     this.app = new OnlineGameApp({
-      baseUrl: 'http://127.0.0.1:3000',
-      wsEndpoint: 'ws://127.0.0.1:2567',
+      baseUrl: BASE_URL,
+      wsEndpoint: WS_ENDPOINT,
       wechatCode: MOCK_CODE,
     });
-    this.onCoins = (gold: number) => { if (this.goldLabel) this.goldLabel.string = `金币 ${gold}`; };
-    this.onPlot = () => this.refreshAll();
-    EventBus.on(GameEvent.CoinsChanged, this.onCoins as never);
-    EventBus.on(GameEvent.PlotStateChanged, this.onPlot as never);
-    this.onConn = (connected: boolean) => {
-      this.setStatus(connected ? '已连接服务端' : '连接断开，自动重连中…');
-      if (connected) this.refreshAll();
-    };
-    this.app.onConnectionChange(this.onConn);
-
-    // 暴露给开发者工具自动化/控制台，便于验收断言。
-    (globalThis as { __farm?: unknown }).__farm = {
+    this.wireEvents();
+    (globalThis as { __farm?: FarmGlobal }).__farm = {
       app: this.app,
-      state: () => this.app?.state() ?? null,
+      state: () => {
+        try {
+          return this.app?.state() ?? null;
+        } catch {
+          return null;
+        }
+      },
+      actions: {
+        plant: (plotIndex, cropId) => this.requireApp().plant(plotIndex, cropId),
+        water: (plotIndex) => this.requireApp().water(plotIndex),
+        harvest: (plotIndex) => this.requireApp().harvest(plotIndex),
+        unlock: (plotIndex) => this.requireApp().unlock(plotIndex),
+      },
     };
 
     // 后端未起时轮询重试 start（OnlineGameApp.start 抛错即离线）。
     this.schedule(() => { void this.ensureStarted(); }, 3);
     await this.ensureStarted();
-    this.schedule(() => this.refreshAll(), 1);
-    this.refreshAll();
+    this.schedule(() => this.tickOneSecond(), 1);
+    this.schedule(() => this.sideColumn?.setClock(this.wallClock()), 30);
+    this.sideColumn?.setClock(this.wallClock());
+  }
+
+  update(dt: number): void {
+    this.fx?.update(dt);
+    this.toast?.update(dt);
+    this.dialogs?.update(dt);
+    this.hud?.update(dt);
+    this.mapLayer?.tick(dt);
   }
 
   onDestroy(): void {
-    if (this.onCoins) EventBus.off(GameEvent.CoinsChanged, this.onCoins as never);
-    if (this.onPlot) EventBus.off(GameEvent.PlotStateChanged, this.onPlot as never);
+    for (let i = 0; i < this.offEvents.length; i += 1) this.offEvents[i]();
+    this.offEvents = [];
     void this.app?.stop().catch(() => undefined);
   }
 
-  // ── 启动 ────────────────────────────────────────────────
+  // ── boot ────────────────────────────────────────────────
+
+  private async boot(): Promise<void> {
+    const layout = await loadPlotLayout();
+    this.mapLayer = await MapLayer.create(this.node, layout, (done, total) => {
+      this.setStatus(`加载贴图 ${done}/${total}…`);
+    });
+    const frames = this.mapLayer.framesMap;
+
+    // ScreenUI container must track the VISIBLE screen box (Fit-Width varies),
+    // otherwise child Widgets anchor to a 720-wide box that overflows phones.
+    const screenUi = sizedNode('ScreenUI', 720, 1280, this.node);
+    applyWidget(screenUi, { left: 0, right: 0, top: 0, bottom: 0 });
+
+    this.hud = new Hud(screenUi, frames);
+    this.sideColumn = new SideColumn(screenUi, frames, () => {
+      this.dialogs?.showSeedPicker();
+    }, (label) => this.toast?.show(`「${label}」未开放`));
+    this.bottomBar = new BottomBar(screenUi, frames);
+    this.toast = new ToastLayer(screenUi);
+    this.dialogs = new DialogLayer(screenUi, frames);
+    this.dialogs.onResult = (result) => this.onDialogResult(result);
+
+    this.fx = new FxPlayer(this.mapLayer.fxLayer);
+    this.fx.setFrames(frames);
+
+    for (let i = 0; i < this.mapLayer.plotViews.length; i += 1) {
+      const plot = this.mapLayer.plotViews[i];
+      plot.onAction = (plotIndex, action) => this.onPlotAction(plotIndex, action);
+    }
+  }
+
+  private requireApp(): OnlineGameApp {
+    if (this.app === null) throw new Error('app not ready');
+    return this.app;
+  }
 
   private async ensureStarted(): Promise<void> {
     if (this.started || this.app === null) return;
     try {
       await this.app.start();
       this.started = true;
-      this.setStatus('已连接服务端');
+      this.setConnected(true);
       this.refreshAll();
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -102,141 +186,190 @@ export class OnlineFarm extends Component {
     }
   }
 
-  // ── 交互 ────────────────────────────────────────────────
+  // ── events ──────────────────────────────────────────────
 
-  private onPlotClick(plotIndex: number): void {
-    if (!this.app || !this.started) return;
-    const plot = this.app.state().plots[plotIndex];
-    if (!plot || !plot.unlocked) return;
-    if (plot.status === 'empty') {
-      void this.app.plant(plotIndex, DEFAULT_CROP).catch((e) => this.setStatus(`种植失败: ${String((e as Error).message)}`));
-    } else if (plot.status === 'ripe' || plot.derivedRipe) {
-      void this.app.harvest(plotIndex).catch((e) => this.setStatus(`收获失败: ${String((e as Error).message)}`));
-    } else if (plot.status === 'growing') {
-      void this.app.water(plotIndex).catch((e) => this.setStatus(`浇水失败: ${String((e as Error).message)}`));
+  private wireEvents(): void {
+    const onCoins = (gold: number): void => {
+      this.hud?.setGold(gold);
+      this.dialogs?.setGold(gold);
+    };
+    const onGems = (gems: number): void => this.hud?.setGems(gems);
+    const onPlot = (index: number): void => this.refreshPlot(index);
+    const onHarvest = (payload: { plotIndex: number }): void => {
+      this.playHarvestFx(payload.plotIndex);
+    };
+    const onConnected = (): void => this.setConnected(true);
+    const onDisconnected = (): void => this.setConnected(false);
+
+    EventBus.on(GameEvent.CoinsChanged, onCoins as never);
+    EventBus.on(GameEvent.DiamondsChanged, onGems as never);
+    EventBus.on(GameEvent.PlotStateChanged, onPlot as never);
+    EventBus.on(GameEvent.CropHarvested, onHarvest as never);
+    EventBus.on(GameEvent.ServerConnected, onConnected as never);
+    EventBus.on(GameEvent.ServerDisconnected, onDisconnected as never);
+    this.offEvents = [
+      () => EventBus.off(GameEvent.CoinsChanged, onCoins as never),
+      () => EventBus.off(GameEvent.DiamondsChanged, onGems as never),
+      () => EventBus.off(GameEvent.PlotStateChanged, onPlot as never),
+      () => EventBus.off(GameEvent.CropHarvested, onHarvest as never),
+      () => EventBus.off(GameEvent.ServerConnected, onConnected as never),
+      () => EventBus.off(GameEvent.ServerDisconnected, onDisconnected as never),
+    ];
+  }
+
+  private setConnected(connected: boolean): void {
+    this.hud?.setConnected(connected);
+    if (connected) {
+      this.setStatus('已连接服务端');
+      this.refreshAll();
+      if (!this.greeted) {
+        this.greeted = true;
+        this.toast?.show('点击空地选种，成熟后点击收获');
+      }
+    } else {
+      this.setStatus('连接断开，自动重连中…');
     }
   }
 
-  // ── 刷新 ────────────────────────────────────────────────
+  // ── plot interactions (U07) ─────────────────────────────
+
+  private onPlotAction(plotIndex: number, action: PlotAction): void {
+    if (!this.started || this.app === null) {
+      this.toast?.show('未连接服务端');
+      return;
+    }
+    if (action === 'plant') {
+      this.pendingPlot = plotIndex;
+      this.dialogs?.showSeedPicker();
+      return;
+    }
+    if (action === 'unlock') {
+      this.pendingPlot = plotIndex;
+      this.dialogs?.showUnlockConfirm(plotIndex);
+      return;
+    }
+    const world = this.mapLayer?.plotViews[plotIndex]?.node.worldPosition;
+    if (action === 'water') {
+      if (world) this.fx?.playWaterSplash(world.clone());
+      this.app.water(plotIndex).catch((err) => this.showFailure(err));
+      return;
+    }
+    if (action === 'harvest') {
+      if (world) this.playHarvestFx(plotIndex);
+      this.app.harvest(plotIndex).catch((err) => this.showFailure(err));
+    }
+  }
+
+  private onDialogResult(result: { kind: 'close' } | { kind: 'pick'; cropId: string } | { kind: 'confirm'; plotIndex: number }): void {
+    if (result.kind === 'close') return;
+    if (result.kind === 'pick') {
+      if (this.pendingPlot < 0) return;
+      const plotIndex = this.pendingPlot;
+      this.pendingPlot = -1;
+      const world = this.mapLayer?.plotViews[plotIndex]?.node.worldPosition;
+      if (world) this.fx?.playPlantDust(world.clone());
+      this.requireApp().plant(plotIndex, result.cropId).catch((err) => this.showFailure(err));
+      return;
+    }
+    // confirm — unlock
+    this.requireApp().unlock(result.plotIndex).catch((err) => this.showFailure(err));
+  }
+
+  /** Error → toast, with the common failures translated (raw text stays in console). */
+  private showFailure(err: unknown): void {
+    const raw = String((err as Error)?.message ?? err);
+    // eslint-disable-next-line no-console
+    console.error('[OnlineFarm] command failed', err);
+    let text = `操作失败: ${raw.slice(0, 36)}`;
+    if (raw.indexOf('insufficient gold') >= 0) text = '金币不足';
+    else if (raw.indexOf('max water') >= 0) text = '这块地浇过水啦';
+    else if (raw.indexOf('not started') >= 0 || raw.indexOf('not joined') >= 0) text = '未连接服务端';
+    this.toast?.show(text);
+  }
+
+  private playHarvestFx(plotIndex: number): void {
+    const plot = this.mapLayer?.plotViews[plotIndex];
+    if (!plot || !this.fx) return;
+    const world = plot.node.worldPosition.clone();
+    this.fx.playHarvestBurst(world);
+    this.fx.playCoinFly(world, this.hudGoldWorld());
+  }
+
+  /** Gold plaque center in world space (widget: left 24 + w/2, top 12 + h/2). */
+  private hudGoldWorld(): Vec3 {
+    const size = view.getVisibleSize();
+    return new Vec3(24 + 100 / 2 - size.width / 2, size.height / 2 - (12 + 108 / 2), 0);
+  }
+
+  // ── refresh ─────────────────────────────────────────────
+
+  private currentState(): OnlineState | null {
+    if (!this.app) return null;
+    try {
+      return this.app.state();
+    } catch {
+      return null; // start() 之前 state() 抛「未启动」属预期
+    }
+  }
 
   private refreshAll(): void {
-    if (!this.app) return;
-    let s: OnlineState;
-    try {
-      s = this.app.state();
-    } catch {
-      return; // start() 之前 state() 抛「未启动」属预期
-    }
-    if (this.goldLabel) this.goldLabel.string = `金币 ${s.gold}`;
-    for (const plot of s.plots) this.refreshPlot(plot);
+    const s = this.currentState();
+    if (!s || !this.mapLayer) return;
+    this.hud?.setGold(s.gold);
+    this.dialogs?.setGold(s.gold);
+    this.hud?.setGems(s.gems);
+    for (let i = 0; i < s.plots.length; i += 1) this.refreshPlot(i);
   }
 
-  private refreshPlot(plot: PlotView): void {
-    const node = this.plotNodes[plot.index];
-    if (!node) return;
-    const sprite = node.getComponent(Sprite);
-    if (!sprite) return;
-
-    const set = (key: string): void => {
-      const frame = this.frames[key];
-      if (frame && sprite.spriteFrame !== frame) sprite.spriteFrame = frame;
-    };
-    if (!plot.unlocked || plot.status === 'locked') {
-      set('locked');
-      return;
-    }
-    if (plot.status === 'empty') {
-      set('grass-empty');
-      return;
-    }
-    if (plot.status === 'ripe' || plot.derivedRipe) {
-      set('carrot-stage-4');
-      return;
-    }
-    // growing：按服务端时钟进度切 stage-1/2/3
-    const total = (plot.matureAt ?? 0) - (plot.plantedAt ?? 0);
-    const elapsed = Math.max(0, Date.now() + this.app!.state().serverNowOffsetMs - (plot.plantedAt ?? 0));
-    const progress = total > 0 ? elapsed / total : 1;
-    if (progress < 0.34) set('carrot-stage-1');
-    else if (progress < 0.67) set('carrot-stage-2');
-    else set('carrot-stage-3');
+  private refreshPlot(index: number): void {
+    const s = this.currentState();
+    const plot: OnlinePlotView | undefined = s?.plots[index];
+    if (!plot) return;
+    const serverNow = Date.now() + (s?.serverNowOffsetMs ?? 0);
+    this.mapLayer?.plotViews[index]?.refreshView(plot, serverNow);
   }
 
-  // ── UI 构建 ─────────────────────────────────────────────
-
-  private buildUi(): void {
-    const canvas = this.node;
-    const vis = view.getVisibleSize();
-    const cell = Math.min(vis.width / (COLUMNS + 1.5), vis.height / (ROWS + 6));
-
-    this.goldLabel = this.makeLabel('金币 —', cell * 0.42, new Vec3(0, vis.height / 2 - cell * 1.1, 0), Color.BLACK);
-    this.statusLabel = this.makeLabel('初始化…', cell * 0.3, new Vec3(0, vis.height / 2 - cell * 1.8, 0), new Color(90, 90, 90));
-    this.tipLabel = this.makeLabel('点击空地种植 · 点击生长中浇水 · 点击成熟收获', cell * 0.26, new Vec3(0, -vis.height / 2 + cell * 0.8, 0), new Color(120, 120, 120));
-
-    const gridY0 = cell * 0.6;
-    const gap = cell * 0.14;
-    for (let i = 0; i < PLOT_COUNT; i += 1) {
-      const col = i % COLUMNS;
-      const row = Math.floor(i / COLUMNS);
-      const node = new Node(`Plot_${i}`);
-      node.layer = Layers.Enum.UI_2D;
-      node.setParent(canvas);
-      node.addComponent(UITransform).setContentSize(cell, cell);
-      node.setPosition(
-        (col - (COLUMNS - 1) / 2) * (cell + gap),
-        gridY0 - row * (cell + gap),
-        0,
-      );
-      const sprite = node.addComponent(Sprite);
-      sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-      sprite.type = Sprite.Type.SIMPLE;
-      const plotIndex = i;
-      node.on(Node.EventType.TOUCH_END, () => this.onPlotClick(plotIndex));
-      this.plotNodes.push(node);
+  /** 1s tick — countdown labels + stage flips are time-driven. */
+  private tickOneSecond(): void {
+    const s = this.currentState();
+    if (!s || !this.mapLayer) return;
+    const serverNow = Date.now() + s.serverNowOffsetMs;
+    for (let i = 0; i < s.plots.length; i += 1) {
+      this.mapLayer.plotViews[i]?.refreshView(s.plots[i], serverNow);
     }
   }
 
-  private makeLabel(text: string, fontSize: number, pos: Vec3, color: Color): Label {
-    const node = new Node(`Label_${text.slice(0, 4)}`);
-    node.layer = Layers.Enum.UI_2D;
-    node.setParent(this.node);
-    node.setPosition(pos);
-    const label = node.addComponent(Label);
-    label.string = text;
-    label.fontSize = fontSize;
-    label.lineHeight = fontSize * 1.3;
-    label.color = color;
-    return label;
+  private wallClock(): string {
+    const now = new Date();
+    const hh = now.getHours();
+    const mm = now.getMinutes();
+    return `${hh < 10 ? '0' : ''}${hh}:${mm < 10 ? '0' : ''}${mm}`;
+  }
+
+  // ── static UI ───────────────────────────────────────────
+
+  private buildLoadingCover(): void {
+    const cover = sizedNode('LoadingCover', 720, 1280, this.node);
+    cover.setPosition(0, 0, 0);
+    roundRect(cover, 720, 1280, 0, SKY_COLOR);
+    this.loadingCover = cover;
+  }
+
+  private buildStatusLabels(): void {
+    const status = makeLabel('Status', '初始化…', 20, new Color(70, 70, 70, 255), this.node);
+    status.node.setPosition(0, 600, 0);
+    this.statusLabel = status;
+    const tip = makeLabel('Tip', '点击空地种植 · 点击生长中浇水 · 点击成熟收获', 18, new Color(70, 60, 40, 255), this.node);
+    tip.node.setPosition(0, -300, 0);
   }
 
   private setStatus(text: string): void {
     if (this.statusLabel) this.statusLabel.string = text;
+    if (this.loadingCover && text.indexOf('已连接') >= 0) {
+      this.loadingCover.destroy();
+      this.loadingCover = null;
+    }
     // eslint-disable-next-line no-console
     console.log(`[OnlineFarm] ${text}`);
-  }
-
-  // ── 资源 ────────────────────────────────────────────────
-
-  private loadFrames(): Promise<SpriteMap> {
-    const keys = [
-      'game/plots/locked',
-      'game/plots/grass-empty',
-      'game/crops/carrot/stage-1',
-      'game/crops/carrot/stage-2',
-      'game/crops/carrot/stage-3',
-      'game/crops/carrot/stage-4',
-    ];
-    const map: SpriteMap = {};
-    return Promise.all(keys.map((path) => new Promise<void>((resolve, reject) => {
-      resources.load(`${path}/spriteFrame`, SpriteFrame, (err, frame) => {
-        if (err || !frame) {
-          reject(err ?? new Error(`missing frame ${path}`));
-          return;
-        }
-        const key = path.split('/').slice(2).join('-');
-        map[key] = frame as SpriteFrame;
-        resolve();
-      });
-    }))).then(() => map);
   }
 }

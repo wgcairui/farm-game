@@ -247,6 +247,41 @@ test('e2e online: server-authoritative lifecycle', { concurrency: false }, async
     assert.equal(s.gold, 180);
   });
 
+  await t.test('WS: unlock(6) + corn plant + water + failure semantics (UI 路径 U09)', async () => {
+    if (!app) {
+      t.skip('app not started');
+      return;
+    }
+    const plotEvents: number[] = [];
+    const onPlot = (n: number): void => { plotEvents.push(n); };
+    EventBus.on(GameEvent.PlotStateChanged, onPlot);
+    try {
+      await app.unlock(6);
+    } finally {
+      EventBus.off(GameEvent.PlotStateChanged, onPlot);
+    }
+    let s = app.state();
+    assert.equal(s.plots[6].unlocked, true, 'plot 6 must unlock');
+    assert.equal(s.plots.filter((p) => p.unlocked).length, 7);
+    assert.equal(s.gold, 80, '200 − 10 − 10 − 100(unlock)');
+    assert.ok(plotEvents.includes(6), 'PlotStateChanged(6) must fire');
+
+    await app.plant(3, 'corn');
+    s = app.state();
+    assert.equal(s.plots[3].cropId, 'corn');
+    assert.equal(s.gold, 20);
+    const matureBefore = s.plots[3].matureAt ?? 0;
+
+    await app.water(3);
+    s = app.state();
+    assert.equal(s.plots[3].waterCount, 1);
+    assert.ok((s.plots[3].matureAt ?? 0) < matureBefore, 'water must discount remaining time');
+
+    // failure semantics the UI toast layer depends on (U07)
+    await assert.rejects(() => app.plant(0, 'carrot'), /not empty/);
+    await assert.rejects(() => app.plant(4, 'strawberry'), /insufficient gold/);
+  });
+
   await t.test('view derivation: a growing plot with past matureAt shows derivedRipe=true', async () => {
     if (!app) {
       t.skip('app not started');

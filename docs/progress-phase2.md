@@ -499,10 +499,42 @@ wx transport **真机**回归（模拟器已验证的 wx-compat 需在真机网�
 | P | batch-assets 切图抠图归档 v13（45 件） | ✅ |
 | B | 作物修复（carrot/corn/potato，两轮） | ✅ |
 | C | 特效 5 组单帧（2 张二轮修复） | ✅ |
-| D | 远山第二层 + 宽幅视差长条 | 待做 |
-| E | 树林带/灌木/云补充 | 待做 |
-| F | 水域（波光 2 帧/荷叶/小桥） | 待做 |
-| G | 道路/栅栏拼块 + 水井 | 待做 |
-| H | UI 套件（HUD/功能列/弹窗底板） | 待做 |
+| D | 远山第二层 + 宽幅视差长条 | ✅ 品红底 + R−G 键控 + 镜像加宽 2880px；远山层经去偏色处理 |
+| E | 树林带/灌木/云补充 | ✅ 树林带 1 + 灌木 4；云朵由底图天空承担，未单独出 |
+| F | 水域（波光 2 帧/荷叶/小桥） | ✅ 水面 1 + 程序化微闪第二帧 / 荷叶 2 + 睡莲 / 木桥 |
+| G | 道路/栅栏拼块 + 水井 | ✅ 石板直/弯/端 + 土路直 + 栅栏直/X/门；水井批次 P 已有 |
+| H | UI 套件（HUD/功能列/弹窗底板） | ✅ 木圆钮 4 / 商店+萌宠入口 / 金条+点券栏 / 弹窗木牌 / 确认+关闭+圆钮 / 滑杆 |
 
 被淘汰候选轮次（`generated/{candidates,qualified-candidates,far-view-candidates}/`）本地保留、git 排除（`e46131f`）。
+
+---
+
+## 14. 主页 UI 实施（v13 素材 + 模拟器优先）——U01–U18 代码与构建收口
+
+> 2026-09-12。方案 [implementation-plan-ui-v13.md](./implementation-plan-ui-v13.md)（r2）。本轮完成 M1–M5 全部代码、素材入库、构建链与 node 侧验收；**模拟器 E2E 与视觉走查被 GUI 阻塞**（§14.4），待人工打开一次 IDE 后跑 `scripts/farm-sim-e2e.mjs` 收口。
+
+### 14.1 已交付
+
+- **素材管线（U01）**：`scripts/prepare-cocos-assets.py` 从 `assets/sprites/v13/` 82 件生成 `resources/game/`（缩放+PNG8 量化+JPEG 重压缩），幂等，报告 `prepare-report.json`。**1.78MB / 81 件**（预算 4.8MB 内）。旧 `slice-assets` 8 张退役。已知缺陷处理：`overlay_selected`（沙堆误图）排除；`overlay_ripe` 有少量键控残留（记录待重生）。
+- **场景代码（U02–U08/U10–U14/U20–U23）**：`assets/scripts/` 新增 `farm/{layout,widgets,assets,plotView,mapLayer,hud,sideColumn,bottomBar,dialogs,toast,fx}.ts` 共 11 模块，`OnlineFarm.ts` 重写为编排根组件。720×1280 Fit-Height；24 格由 `plot-layout.json` 驱动（y 轴翻转见 layout.ts）；地块六态（wet/ripe 为整块替换图）；5 作物×4 阶段+倒计时；选种弹窗（信息密度范式）/解锁确认/Toast 队列/断线横幅/种植尘土·浇水水花·收获爆发·金币飞行四特效；命中区独立节点 85 设计 px（≈44pt）。
+- **交互零协议变更（D4）**：全部经 `OnlineGameApp` 既有四命令；vendor bundle 补 `CROPS/getCrop` 导出。
+- **场景层开关（U20–U22 偏差修正）**：底图自带完整造景（池塘/木桥/栅栏/农舍/道路已画），视差条/水域/摆件三层**默认关闭**（`layout.ts` SHOW_* 开关，节点已挂载），留给漫游地图里程碑启用——避免与底图重影。
+- **E2E（U09/U16）**：`test/e2e-online.test.ts` 新增 unlock+玉米+浇水+失败语义子测试；`scripts/farm-sim-e2e.mjs`（模拟器自动化，待 GUI 解锁）与 `scripts/farm-sim-probe.mjs`（诊断探针）入库。
+
+### 14.2 验证矩阵
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | 4 包 tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测+集成 | ✅ **111/111**（shared 31 + server 44 + mini 29 + app 7；e2e 真实双进程含新 unlock 场景） |
+| shared build → build:cocos → Cocos CLI 构建 | 完整构建链 | ✅ 6.6s，产物 81 PNG + 1 JPG + 脚本包齐全 |
+| 包体（U17） | build/wechatgame | 总 11MB：**debug 引擎 7.2MB**（release+裁剪是 G4 事项）、resources 2.3MB、main 744KB、internal 740KB；素材达预算，parallax 远程包切分暂不需要 |
+| 模拟器 E2E + 三尺寸走查（U15） | DevTools | ⏳ 被 §14.4 GUI 阻塞 |
+
+### 14.3 遗留缺陷（不阻塞）
+
+- `overlay_ripe` 键控黑斑（少量，重生素材时顺带修）；套件缺提篮/公益图标（seed_bag 降级已实现）；水面第二帧为程序化微闪（开关关闭中）。
+
+### 14.4 模拟器 GUI 阻塞（2026-09-12，headless 排障定论）
+
+CLI/automator 全链路无人值守失败定论：`cli auto` → AppID 坑（Cocos 构建产物残留 `wx6ac3f5090a6b99c5` → `不存在此 AppID (code 10)`，已 patch `touristappid` 解决）→ 之后 launch/checkVersion 正常但**模拟器窗口不编译**（3 分钟窗口零 console、零 2567 连接）。判定铁证与排障工具见 [cocos-runbook.md §11](./cocos-runbook.md)。**恢复步骤：人工打开微信开发者工具 → 确认首启弹窗（游客模式/更新公告）→ 模拟器出现画面 → `node scripts/farm-sim-e2e.mjs`**。

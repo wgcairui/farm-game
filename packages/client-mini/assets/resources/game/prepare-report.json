@@ -1,0 +1,1306 @@
+{
+  "generatedBy": "scripts/prepare-cocos-assets.py",
+  "source": "assets/sprites/v13",
+  "excluded": [
+    "plots/overlay_selected.png (defective: sand pile + keying residue)"
+  ],
+  "totalsByGroup": {
+    "crops": "177KB",
+    "fx": "206KB",
+    "icons": "64KB",
+    "map": "289KB",
+    "modules": "254KB",
+    "parallax": "562KB",
+    "plot-layout": "5KB",
+    "plots": "50KB",
+    "ui": "215KB"
+  },
+  "totalBytes": 1869884,
+  "totalHuman": "1.78MB",
+  "files": [
+    {
+      "src": "assets/sprites/v13/map/farm-map-base-2x.jpeg",
+      "dst": "packages/client-mini/assets/resources/game/map/base.jpg",
+      "srcBytes": 613619,
+      "srcSize": [
+        1440,
+        2560
+      ],
+      "dstBytes": 296224,
+      "note": "jpeg q82",
+      "group": "map"
+    },
+    {
+      "src": "assets/sprites/v13/map/plot-layout.json",
+      "dst": "packages/client-mini/assets/resources/game/plot-layout.json",
+      "srcBytes": 5462,
+      "dstBytes": 5462,
+      "note": "copied",
+      "group": "plot-layout"
+    },
+    {
+      "src": "assets/sprites/v13/plots/plot_locked.png",
+      "dst": "packages/client-mini/assets/resources/game/plots/plot_locked.png",
+      "srcBytes": 606803,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 10277,
+      "note": "box/resized + quantized (rgba would be 46KB)",
+      "group": "plots"
+    },
+    {
+      "src": "assets/sprites/v13/plots/plot_grass_empty.png",
+      "dst": "packages/client-mini/assets/resources/game/plots/plot_grass_empty.png",
+      "srcBytes": 529577,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 9052,
+      "note": "box/resized + quantized (rgba would be 45KB)",
+      "group": "plots"
+    },
+    {
+      "src": "assets/sprites/v13/plots/plot_tilled_empty.png",
+      "dst": "packages/client-mini/assets/resources/game/plots/plot_tilled_empty.png",
+      "srcBytes": 553655,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 8388,
+      "note": "box/resized + quantized (rgba would be 41KB)",
+      "group": "plots"
+    },
+    {
+      "src": "assets/sprites/v13/plots/overlay_wet.png",
+      "dst": "packages/client-mini/assets/resources/game/plots/overlay_wet.png",
+      "srcBytes": 735242,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 12008,
+      "note": "box/resized + quantized (rgba would be 48KB)",
+      "group": "plots"
+    },
+    {
+      "src": "assets/sprites/v13/plots/overlay_ripe.png",
+      "dst": "packages/client-mini/assets/resources/game/plots/overlay_ripe.png",
+      "srcBytes": 787319,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 12182,
+      "note": "box/resized + quantized (rgba would be 48KB)",
+      "group": "plots"
+    },
+    {
+      "src": "assets/sprites/v13/crops/carrot_stage1.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/carrot/stage-1.png",
+      "srcBytes": 99856,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 6927,
+      "note": "box/resized + quantized (rgba would be 26KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/carrot_stage2.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/carrot/stage-2.png",
+      "srcBytes": 181797,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 12226,
+      "note": "box/resized + quantized (rgba would be 50KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/carrot_stage3.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/carrot/stage-3.png",
+      "srcBytes": 217093,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 14494,
+      "note": "box/resized + quantized (rgba would be 61KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/carrot_stage4.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/carrot/stage-4.png",
+      "srcBytes": 198150,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 12958,
+      "note": "box/resized + quantized (rgba would be 53KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/corn_stage1.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/corn/stage-1.png",
+      "srcBytes": 57835,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 2814,
+      "note": "box/resized + quantized (rgba would be 8KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/corn_stage2.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/corn/stage-2.png",
+      "srcBytes": 73446,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 4107,
+      "note": "box/resized + quantized (rgba would be 13KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/corn_stage3.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/corn/stage-3.png",
+      "srcBytes": 98979,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 6477,
+      "note": "box/resized + quantized (rgba would be 22KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/corn_stage4.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/corn/stage-4.png",
+      "srcBytes": 158009,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 9843,
+      "note": "box/resized + quantized (rgba would be 36KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/potato_stage1.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/potato/stage-1.png",
+      "srcBytes": 147722,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 8759,
+      "note": "box/resized + quantized (rgba would be 34KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/potato_stage2.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/potato/stage-2.png",
+      "srcBytes": 200762,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 12968,
+      "note": "box/resized + quantized (rgba would be 53KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/potato_stage3.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/potato/stage-3.png",
+      "srcBytes": 138376,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 8101,
+      "note": "box/resized + quantized (rgba would be 35KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/potato_stage4.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/potato/stage-4.png",
+      "srcBytes": 435181,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 9386,
+      "note": "box/resized + quantized (rgba would be 38KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/strawberry_stage1.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/strawberry/stage-1.png",
+      "srcBytes": 114425,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 5903,
+      "note": "box/resized + quantized (rgba would be 25KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/strawberry_stage2.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/strawberry/stage-2.png",
+      "srcBytes": 178015,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 9818,
+      "note": "box/resized + quantized (rgba would be 42KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/strawberry_stage3.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/strawberry/stage-3.png",
+      "srcBytes": 152522,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 8542,
+      "note": "box/resized + quantized (rgba would be 36KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/strawberry_stage4.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/strawberry/stage-4.png",
+      "srcBytes": 228630,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 13765,
+      "note": "box/resized + quantized (rgba would be 56KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/tomato_stage1.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/tomato/stage-1.png",
+      "srcBytes": 96845,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 4965,
+      "note": "box/resized + quantized (rgba would be 18KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/tomato_stage2.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/tomato/stage-2.png",
+      "srcBytes": 165343,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 10255,
+      "note": "box/resized + quantized (rgba would be 39KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/tomato_stage3.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/tomato/stage-3.png",
+      "srcBytes": 122511,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 7261,
+      "note": "box/resized + quantized (rgba would be 27KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/crops/tomato_stage4.png",
+      "dst": "packages/client-mini/assets/resources/game/crops/tomato/stage-4.png",
+      "srcBytes": 190156,
+      "srcSize": [
+        512,
+        512
+      ],
+      "dstSize": [
+        256,
+        256
+      ],
+      "dstBytes": 11783,
+      "note": "box/resized + quantized (rgba would be 50KB)",
+      "group": "crops"
+    },
+    {
+      "src": "assets/sprites/v13/icons/coin_gold.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/coin_gold.png",
+      "srcBytes": 51631,
+      "srcSize": [
+        173,
+        160
+      ],
+      "dstSize": [
+        173,
+        160
+      ],
+      "dstBytes": 8447,
+      "note": "box/resized + quantized (rgba would be 48KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/coin_flying.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/coin_flying.png",
+      "srcBytes": 49308,
+      "srcSize": [
+        183,
+        140
+      ],
+      "dstSize": [
+        183,
+        140
+      ],
+      "dstBytes": 8735,
+      "note": "box/resized + quantized (rgba would be 46KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/harvest_sparkle.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/harvest_sparkle.png",
+      "srcBytes": 58508,
+      "srcSize": [
+        183,
+        193
+      ],
+      "dstSize": [
+        183,
+        193
+      ],
+      "dstBytes": 8049,
+      "note": "box/resized + quantized (rgba would be 53KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/lock_sign.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/lock_sign.png",
+      "srcBytes": 33197,
+      "srcSize": [
+        144,
+        154
+      ],
+      "dstSize": [
+        144,
+        154
+      ],
+      "dstBytes": 5916,
+      "note": "box/resized + quantized (rgba would be 31KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/seed_bag.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/seed_bag.png",
+      "srcBytes": 41603,
+      "srcSize": [
+        161,
+        167
+      ],
+      "dstSize": [
+        161,
+        167
+      ],
+      "dstBytes": 7233,
+      "note": "box/resized + quantized (rgba would be 39KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/star_gold.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/star_gold.png",
+      "srcBytes": 39925,
+      "srcSize": [
+        173,
+        171
+      ],
+      "dstSize": [
+        173,
+        171
+      ],
+      "dstBytes": 4948,
+      "note": "box/resized + quantized (rgba would be 36KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/water_drop.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/water_drop.png",
+      "srcBytes": 58084,
+      "srcSize": [
+        171,
+        187
+      ],
+      "dstSize": [
+        171,
+        187
+      ],
+      "dstBytes": 7828,
+      "note": "box/resized + quantized (rgba would be 53KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/watering_can.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/watering_can.png",
+      "srcBytes": 44792,
+      "srcSize": [
+        198,
+        153
+      ],
+      "dstSize": [
+        198,
+        153
+      ],
+      "dstBytes": 7587,
+      "note": "box/resized + quantized (rgba would be 43KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/icons/watering_can_alt.png",
+      "dst": "packages/client-mini/assets/resources/game/icons/watering_can_alt.png",
+      "srcBytes": 46759,
+      "srcSize": [
+        211,
+        155
+      ],
+      "dstSize": [
+        211,
+        155
+      ],
+      "dstBytes": 7777,
+      "note": "box/resized + quantized (rgba would be 45KB)",
+      "group": "icons"
+    },
+    {
+      "src": "assets/sprites/v13/effects/fx_plant_dust.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/plant_dust.png",
+      "srcBytes": 355267,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 14399,
+      "note": "box/resized + quantized (rgba would be 67KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/effects/fx_water_splash.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/water_splash.png",
+      "srcBytes": 834487,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 44737,
+      "note": "box/resized + quantized (rgba would be 239KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/effects/fx_harvest_burst.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/harvest_burst.png",
+      "srcBytes": 964089,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 44469,
+      "note": "box/resized + quantized (rgba would be 216KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/effects/fx_coin_fly.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/coin_fly.png",
+      "srcBytes": 378892,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 10946,
+      "note": "box/resized + quantized (rgba would be 44KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/effects/fx_levelup_badge.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/levelup_badge.png",
+      "srcBytes": 656454,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 31520,
+      "note": "box/resized + quantized (rgba would be 149KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_cottage.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/cottage.png",
+      "srcBytes": 30162,
+      "srcSize": [
+        149,
+        104
+      ],
+      "dstSize": [
+        149,
+        104
+      ],
+      "dstBytes": 6238,
+      "note": "box/resized + quantized (rgba would be 28KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_cottage_small.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/cottage_small.png",
+      "srcBytes": 51130,
+      "srcSize": [
+        229,
+        121
+      ],
+      "dstSize": [
+        229,
+        121
+      ],
+      "dstBytes": 10564,
+      "note": "box/resized + quantized (rgba would be 48KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_bush.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/bush.png",
+      "srcBytes": 46096,
+      "srcSize": [
+        167,
+        157
+      ],
+      "dstSize": [
+        167,
+        157
+      ],
+      "dstBytes": 9473,
+      "note": "box/resized + quantized (rgba would be 43KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_fence_segment.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/fence_segment.png",
+      "srcBytes": 42575,
+      "srcSize": [
+        190,
+        151
+      ],
+      "dstSize": [
+        190,
+        151
+      ],
+      "dstBytes": 7647,
+      "note": "box/resized + quantized (rgba would be 40KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_fence_stones.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/fence_stones.png",
+      "srcBytes": 43760,
+      "srcSize": [
+        181,
+        147
+      ],
+      "dstSize": [
+        181,
+        147
+      ],
+      "dstBytes": 8281,
+      "note": "box/resized + quantized (rgba would be 41KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_fence_white.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/fence_white.png",
+      "srcBytes": 27516,
+      "srcSize": [
+        170,
+        79
+      ],
+      "dstSize": [
+        170,
+        79
+      ],
+      "dstBytes": 5946,
+      "note": "box/resized + quantized (rgba would be 26KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_haystack.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/haystack.png",
+      "srcBytes": 36726,
+      "srcSize": [
+        137,
+        141
+      ],
+      "dstSize": [
+        137,
+        141
+      ],
+      "dstBytes": 7183,
+      "note": "box/resized + quantized (rgba would be 34KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_lotus_pond.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/lotus_pond.png",
+      "srcBytes": 53948,
+      "srcSize": [
+        210,
+        140
+      ],
+      "dstSize": [
+        210,
+        140
+      ],
+      "dstBytes": 10283,
+      "note": "box/resized + quantized (rgba would be 50KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_signboard.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/signboard.png",
+      "srcBytes": 56361,
+      "srcSize": [
+        174,
+        207
+      ],
+      "dstSize": [
+        174,
+        207
+      ],
+      "dstBytes": 9999,
+      "note": "box/resized + quantized (rgba would be 53KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_water_well.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/water_well.png",
+      "srcBytes": 32632,
+      "srcSize": [
+        174,
+        111
+      ],
+      "dstSize": [
+        174,
+        111
+      ],
+      "dstBytes": 6505,
+      "note": "box/resized + quantized (rgba would be 31KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_bush_a.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/bush_a.png",
+      "srcBytes": 123583,
+      "srcSize": [
+        331,
+        250
+      ],
+      "dstSize": [
+        331,
+        250
+      ],
+      "dstBytes": 19945,
+      "note": "box/resized + quantized (rgba would be 114KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_bush_b.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/bush_b.png",
+      "srcBytes": 106572,
+      "srcSize": [
+        289,
+        231
+      ],
+      "dstSize": [
+        289,
+        231
+      ],
+      "dstBytes": 19227,
+      "note": "box/resized + quantized (rgba would be 98KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_bush_c.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/bush_c.png",
+      "srcBytes": 103920,
+      "srcSize": [
+        298,
+        224
+      ],
+      "dstSize": [
+        298,
+        224
+      ],
+      "dstBytes": 18021,
+      "note": "box/resized + quantized (rgba would be 96KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_bush_d.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/bush_d.png",
+      "srcBytes": 98110,
+      "srcSize": [
+        292,
+        218
+      ],
+      "dstSize": [
+        292,
+        218
+      ],
+      "dstBytes": 16444,
+      "note": "box/resized + quantized (rgba would be 90KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_bridge.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/bridge.png",
+      "srcBytes": 495092,
+      "srcSize": [
+        1152,
+        864
+      ],
+      "dstSize": [
+        576,
+        432
+      ],
+      "dstBytes": 23765,
+      "note": "box/resized + quantized (rgba would be 111KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_lily_pad_a.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/lily_pad_a.png",
+      "srcBytes": 117158,
+      "srcSize": [
+        367,
+        222
+      ],
+      "dstSize": [
+        367,
+        222
+      ],
+      "dstBytes": 17184,
+      "note": "box/resized + quantized (rgba would be 110KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_lily_pad_b.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/lily_pad_b.png",
+      "srcBytes": 105883,
+      "srcSize": [
+        346,
+        201
+      ],
+      "dstSize": [
+        346,
+        201
+      ],
+      "dstBytes": 16274,
+      "note": "box/resized + quantized (rgba would be 99KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_lotus_flower.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/lotus_flower.png",
+      "srcBytes": 120526,
+      "srcSize": [
+        326,
+        254
+      ],
+      "dstSize": [
+        326,
+        254
+      ],
+      "dstBytes": 18502,
+      "note": "box/resized + quantized (rgba would be 113KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_pond_water.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/pond_water_a.png",
+      "srcBytes": 700916,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 31084,
+      "note": "box/resized + quantized (rgba would be 160KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/module_pond_water_b.png",
+      "dst": "packages/client-mini/assets/resources/game/fx/pond_water_b.png",
+      "srcBytes": 742714,
+      "srcSize": [
+        1024,
+        1024
+      ],
+      "dstSize": [
+        512,
+        512
+      ],
+      "dstBytes": 34325,
+      "note": "box/resized + quantized (rgba would be 184KB)",
+      "group": "fx"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/path_straight_stone.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/path_straight_stone.png",
+      "srcBytes": 55499,
+      "srcSize": [
+        194,
+        316
+      ],
+      "dstSize": [
+        194,
+        316
+      ],
+      "dstBytes": 8002,
+      "note": "box/resized + quantized (rgba would be 49KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/path_straight_dirt.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/path_straight_dirt.png",
+      "srcBytes": 62872,
+      "srcSize": [
+        197,
+        323
+      ],
+      "dstSize": [
+        197,
+        323
+      ],
+      "dstBytes": 7523,
+      "note": "box/resized + quantized (rgba would be 57KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/path_curve_stone.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/path_curve_stone.png",
+      "srcBytes": 63698,
+      "srcSize": [
+        341,
+        183
+      ],
+      "dstSize": [
+        341,
+        183
+      ],
+      "dstBytes": 6922,
+      "note": "box/resized + quantized (rgba would be 58KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/path_end_cap.png",
+      "dst": "packages/client-mini/assets/resources/game/modules/path_end_cap.png",
+      "srcBytes": 45349,
+      "srcSize": [
+        237,
+        163
+      ],
+      "dstSize": [
+        237,
+        163
+      ],
+      "dstBytes": 6395,
+      "note": "box/resized + quantized (rgba would be 42KB)",
+      "group": "modules"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/mountains_far_strip.png",
+      "dst": "packages/client-mini/assets/resources/game/parallax/mountains_far_strip.png",
+      "srcBytes": 662867,
+      "srcSize": [
+        2880,
+        576
+      ],
+      "dstSize": [
+        2880,
+        576
+      ],
+      "dstBytes": 109207,
+      "note": "box/resized + quantized (rgba would be 587KB)",
+      "group": "parallax"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/mountains_near_strip.png",
+      "dst": "packages/client-mini/assets/resources/game/parallax/mountains_near_strip.png",
+      "srcBytes": 1514946,
+      "srcSize": [
+        2880,
+        319
+      ],
+      "dstSize": [
+        2880,
+        319
+      ],
+      "dstBytes": 226236,
+      "note": "box/resized + quantized (rgba would be 1432KB)",
+      "group": "parallax"
+    },
+    {
+      "src": "assets/sprites/v13/scene-modules/forest_belt_strip.png",
+      "dst": "packages/client-mini/assets/resources/game/parallax/forest_belt_strip.png",
+      "srcBytes": 1530116,
+      "srcSize": [
+        2880,
+        344
+      ],
+      "dstSize": [
+        2880,
+        344
+      ],
+      "dstBytes": 240844,
+      "note": "box/resized + quantized (rgba would be 1421KB)",
+      "group": "parallax"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_btn_close.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_btn_close.png",
+      "srcBytes": 43109,
+      "srcSize": [
+        156,
+        161
+      ],
+      "dstSize": [
+        156,
+        161
+      ],
+      "dstBytes": 6920,
+      "note": "box/resized + quantized (rgba would be 40KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_btn_confirm.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_btn_confirm.png",
+      "srcBytes": 39688,
+      "srcSize": [
+        155,
+        146
+      ],
+      "dstSize": [
+        155,
+        146
+      ],
+      "dstBytes": 6614,
+      "note": "box/resized + quantized (rgba would be 37KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_btn_round_red.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_btn_round_red.png",
+      "srcBytes": 32600,
+      "srcSize": [
+        147,
+        157
+      ],
+      "dstSize": [
+        147,
+        157
+      ],
+      "dstBytes": 4734,
+      "note": "box/resized + quantized (rgba would be 30KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_icon_share.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_icon_share.png",
+      "srcBytes": 83286,
+      "srcSize": [
+        234,
+        255
+      ],
+      "dstSize": [
+        234,
+        255
+      ],
+      "dstBytes": 12157,
+      "note": "box/resized + quantized (rgba would be 76KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_icon_music.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_icon_music.png",
+      "srcBytes": 80608,
+      "srcSize": [
+        233,
+        254
+      ],
+      "dstSize": [
+        233,
+        254
+      ],
+      "dstBytes": 12301,
+      "note": "box/resized + quantized (rgba would be 73KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_icon_menu.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_icon_menu.png",
+      "srcBytes": 80797,
+      "srcSize": [
+        234,
+        255
+      ],
+      "dstSize": [
+        234,
+        255
+      ],
+      "dstBytes": 11627,
+      "note": "box/resized + quantized (rgba would be 73KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_icon_camera.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_icon_camera.png",
+      "srcBytes": 82590,
+      "srcSize": [
+        233,
+        254
+      ],
+      "dstSize": [
+        233,
+        254
+      ],
+      "dstBytes": 12482,
+      "note": "box/resized + quantized (rgba would be 75KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_icon_pet.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_icon_pet.png",
+      "srcBytes": 129707,
+      "srcSize": [
+        291,
+        273
+      ],
+      "dstSize": [
+        291,
+        273
+      ],
+      "dstBytes": 22068,
+      "note": "box/resized + quantized (rgba would be 122KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_icon_shop.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_icon_shop.png",
+      "srcBytes": 171131,
+      "srcSize": [
+        394,
+        337
+      ],
+      "dstSize": [
+        394,
+        337
+      ],
+      "dstBytes": 26362,
+      "note": "box/resized + quantized (rgba would be 160KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_panel_gold_bar.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_panel_gold_bar.png",
+      "srcBytes": 149525,
+      "srcSize": [
+        332,
+        357
+      ],
+      "dstSize": [
+        332,
+        357
+      ],
+      "dstBytes": 24755,
+      "note": "box/resized + quantized (rgba would be 138KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_panel_cash_bar.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_panel_cash_bar.png",
+      "srcBytes": 148324,
+      "srcSize": [
+        332,
+        356
+      ],
+      "dstSize": [
+        332,
+        356
+      ],
+      "dstBytes": 24520,
+      "note": "box/resized + quantized (rgba would be 137KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_popup_panel.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_popup_panel.png",
+      "srcBytes": 639636,
+      "srcSize": [
+        1152,
+        864
+      ],
+      "dstSize": [
+        720,
+        540
+      ],
+      "dstBytes": 48698,
+      "note": "box/resized + quantized (rgba would be 272KB)",
+      "group": "ui"
+    },
+    {
+      "src": "assets/sprites/v13/ui/ui_slider.png",
+      "dst": "packages/client-mini/assets/resources/game/ui/ui_slider.png",
+      "srcBytes": 278235,
+      "srcSize": [
+        1280,
+        720
+      ],
+      "dstSize": [
+        640,
+        360
+      ],
+      "dstBytes": 7091,
+      "note": "box/resized + quantized (rgba would be 31KB)",
+      "group": "ui"
+    }
+  ]
+}

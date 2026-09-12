@@ -13802,10 +13802,12 @@ function installMinigameFetchShims() {
 }
 installMinigameFetchShims();
 export {
+  CROPS,
   EventBus,
   FarmApiError,
   FarmWsError,
   GameEvent,
   OnlineGameApp,
+  getCrop,
   makeOperationId
 };
