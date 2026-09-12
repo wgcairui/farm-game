@@ -41,15 +41,18 @@
     "@mikro-orm/core": "^6.2.0",
     "@mikro-orm/migrations": "^6.2.0",
     "@mikro-orm/postgresql": "^6.2.0",
+    "fast-jwt": "^6.3.3",
     "fastify": "^5.12.3",
     "pg": "^8.11.0",
     "pino": "^10.3.1"
   },
   "devDependencies": {
+    "@colyseus/sdk": "0.18.2",
+    "@colyseus/testing": "0.18.5",
+    "@colyseus/tools": "0.18.3",
     "@types/node": "^22.20.2",
     "@types/pg": "^8.11.0",
     "@types/ws": "^8.18.1",
-    "colyseus.js": "0.16.22",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4",
     "ws": "^8.21.3"

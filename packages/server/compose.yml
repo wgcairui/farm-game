@@ -42,8 +42,9 @@ services:
     container_name: farm-game-redis
     restart: unless-stopped
     ports:
-      # Bind to loopback only — never expose to the LAN.
-      - "127.0.0.1:6379:6379"
+      # Bind to loopback only — never expose to the LAN. Host side uses 6380:
+      # 6379 is routinely occupied by other local projects / port forwards.
+      - "127.0.0.1:6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

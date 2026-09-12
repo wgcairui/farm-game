@@ -1,5 +1,5 @@
 /**
- * WS entry — standalone Colyseus process (G2 T2).
+ * WS entry — standalone Colyseus process (G2).
  *
  * Runs independently from the HTTP entry, sharing the same database wiring
  * via `bootstrapDatabase` (migrations are advisory-lock guarded so both
@@ -11,13 +11,17 @@
  * listen. On shutdown (SIGINT/SIGTERM handled by Colyseus by default),
  * rooms dispose (lease released) and DB resources close.
  *
+ * `buildWsServer` performs everything up to (but excluding) listen and is
+ * exported for the integration tests, which boot the same room stack via
+ * `@colyseus/testing` instead of a real port.
+ *
  * Run: `pnpm --filter @farm-game/server dev:ws` (tsx) or `start:ws` (dist).
  */
 
 import { Server } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { loadConfig, ConfigError } from '../config.js';
-import { bootstrapDatabase } from '../bootstrap.js';
+import { bootstrapDatabase, type ServerBootstrap } from '../bootstrap.js';
 import { createRedisInfra, type RedisInfra } from './redis.js';
 import { FarmRoom, configureFarmRoom } from './room.js';
 import { logger } from '../obs/logger.js';
@@ -27,9 +31,17 @@ export interface WsServerHandle {
   close(): Promise<void>;
 }
 
-export async function startWsServer(overrides?: {
+export interface BuiltWsServer {
+  server: Server;
+  boot: ServerBootstrap;
+  redis: RedisInfra | null;
+  /** Release boot-failure resources (redis infra only — boot.close handles the DB). */
+  close(): Promise<void>;
+}
+
+export async function buildWsServer(overrides?: {
   config?: Partial<import('../config.js').ServerConfig>;
-}): Promise<WsServerHandle> {
+}): Promise<BuiltWsServer> {
   const config = loadConfig(overrides?.config);
   if (!config.redisUrl && config.env === 'production') {
     // loadConfig already refuses; kept as a defensive check for direct calls.
@@ -37,12 +49,21 @@ export async function startWsServer(overrides?: {
   }
 
   const boot = await bootstrapDatabase(config);
-  const redis: RedisInfra | null = config.redisUrl ? await createRedisInfra(config.redisUrl) : null;
+  let redis: RedisInfra | null = null;
+  try {
+    redis = config.redisUrl ? await createRedisInfra(config.redisUrl) : null;
+  } catch (err) {
+    await boot.close();
+    throw err;
+  }
 
   configureFarmRoom({
     leases: boot.leases,
     config,
     instanceId: boot.instanceId,
+    repo: boot.dbRepo,
+    tx: boot.tx,
+    orm: boot.orm,
   });
 
   const server = new Server({
@@ -64,6 +85,23 @@ export async function startWsServer(overrides?: {
     // are ours to release.
     await boot.close();
   });
+
+  return {
+    server,
+    boot,
+    redis,
+    close: async () => {
+      await boot.close();
+    },
+  };
+}
+
+export async function startWsServer(overrides?: {
+  config?: Partial<import('../config.js').ServerConfig>;
+}): Promise<WsServerHandle> {
+  const built = await buildWsServer(overrides);
+  const { server, boot, redis } = built;
+  const config = boot.config;
 
   try {
     await server.listen(config.wsPort, config.wsHost);

@@ -27,6 +27,13 @@ export const ErrorCode = {
   INTERNAL: 4000,
   NOT_IMPLEMENTED: 4001,
   MAINTENANCE: 4002,
+  /**
+   * G2 WS only — the room lost (or never held) the farm lease, so the
+   * command was refused before touching any state. Ephemeral by design:
+   * nothing was persisted, retry the same operationId against whichever
+   * instance now owns the farm.
+   */
+  LEASE_LOST: 4300,
 } as const;
 
 export type ErrorCode = typeof ErrorCode[keyof typeof ErrorCode];

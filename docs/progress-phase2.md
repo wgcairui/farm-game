@@ -299,3 +299,50 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 | `pnpm -r test` | 单测 | ✅ 66/66 |
 | `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
 | `pnpm --filter @farm-game/server test:integration` | 真实 PG（G1 9 项 + 租约 10 项） | ✅ **19/19** |
+---
+
+## 9. T3 — 真实 FarmRoom 完整版（onAuth + 四命令 + 快照 + 广播）
+
+> 契约与测试栈决策已锁入 **ADR-0004**（D31–D37）。T2 骨架（租约仲裁/续租/失租断开）不变，本节在其上补齐鉴权、命令、快照与广播。
+
+### 9.1 关键决策（详见 ADR-0004）
+
+- **D31** 房间无 Colyseus Schema state，DB 唯一权威；C→S 写命令走单通道 `farm_cmd`（command 判别，body 复用 HTTP 形状，services 原样复用）。
+- **D32** envelope 复用 `PROTOCOL_VERSION '2.0.0'`，服务器校验 major；结构垃圾 ephemeral 不落 receipt（镜像 HTTP 400），业务失败仍落 receipt。
+- **D33** `onAuth` 用 `fast-jwt`（`@fastify/jwt` 同底座）以同 secret/iss/aud 验签；`options.ownerId === token.sub` 强一致，跨农场拒绝；verified playerId 走 `client.auth`。
+- **D34** fencing 注入 `executeCommand` 的 `run` 回调：`assertCurrent(em, lease)` 与命令写同事务同连接；`LeaseLostError` → 整事务回滚（命令与收据都不落库）→ 房间断开 → 原 `operationId` 可安全重试。新错误码 `LEASE_LOST: 4300`。
+- **D35** 快照以 `farm_refresh`（拉取）为可靠路径。实测 core 0.18.12 `_onJoin` 先 `await onJoin()` 再发 `JOIN_ROOM`，SDK 客户端必然丢弃 join 推送——推送保留给 G3 自研客户端（缓冲 pre-join 帧）。
+- **D36** 成功命令：请求者 `cmd_result`（r 回声 + `toCommandResponse` 共享投影）+ 全连接 `plot_updated`/`gold_updated`；失败仅回请求者 `error`（带 r），不广播。
+- **D37** 测试栈 `@colyseus/testing@0.18.5` + `@colyseus/sdk@0.18.2`（T1"SDK 只到 0.16"结论仅适用旧包名 `colyseus.js`；生产客户端走 wx.connectSocket 的 G3 结论不变）。`serve.ts` 抽 `buildWsServer(config)` 供测试构造。
+
+### 9.2 新增与改动
+
+- `shared/protocol/ws.ts` 重写 G2 版：删除 `hello`/`steal`（无引用），新增 `farm_cmd`/`farm_refresh`/`welcome`(含全量 `player`)/`cmd_result`/`plot_updated`/`gold_updated`/`error`；`error.ts` 加 `LEASE_LOST: 4300`。
+- `server/auth/verify.ts`（新）：`verifyAccessToken` + `WsAuthError`（expired→1102 / 签名·claim 类→1101 / key·config 类→4000）；`fast-jwt` 提为直接依赖。
+- `server/realtime/ws-messages.ts`（新）：`parseFarmCmd`/`parseFarmRefresh`/`serverEnvelope` 纯函数。
+- `server/realtime/room.ts` 完整版：onAuth + 房间级 `onMessage` 一次注册 + `handleFarmCmd`（结构校验→lease 空检查→executeCommand（run 回调内 assertCurrent）→投影/广播）+ `handleFarmRefresh` + `loseLease()` 断开路径。
+- `server/realtime/serve.ts`：抽 `buildWsServer`（构造不 listen）；`configureFarmRoom` 扩展六件套。
+- `services/farm/execute.ts`：新增 `toCommandResponse`，HTTP routes 与 WS 共用投影（消除双份漂移）。
+- `compose.yml`/`.env.example`：redis 宿主端口 6379→6380（与本机其他项目端口转发冲突）。
+
+### 9.3 集成测试（`test/integration/farm-room.test.ts`，真实 PG + 真实 transport）
+
+`@colyseus/testing` 构造真 Server（临时端口、LocalDriver、无 Redis），覆盖 9 项：welcome 全量投影（24 plots/6 unlocked/revision）；WS plant 落 DB（gold/plot/revision/收据）；第二连接收到 `plot_updated`+`gold_updated` 广播；同 operationId 幂等重放（gold 不重复扣）；坏 token 拒绝；ownerId≠sub 拒绝；**fencing**（SQL 强制过期 + instance-B 接管 epoch=2 → 旧房间命令回 `LEASE_LOST`、房间断开、gold/revision/收据零写入）；matchmaking 同 owner 复用同房间（filterBy）异 owner 隔离；租约被外部持有者占用时建房失败、释放后重试成功。
+
+**测试基建发现**：广播/快照类断言必须在发命令**前**注册 `waitForMessage`——服务端在同一 tick 内投递 cmd_result 与广播，后注册的 listener 会丢失已送达的帧（本次实测踩坑一次后修正）。
+
+### 9.4 验证矩阵（T3 后，真实 PG + 真实 transport）
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测 | ✅ 87/87（server 44） |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG（G1 9 + farm-room 9 + 租约 10） | ✅ **28/28** |
+
+### 9.5 T4 需要接手的点
+
+- HTTP→WS 状态同步：HTTP 写命令后按 revision 通知/轮询刷新 WS 侧快照（`farm_refresh` 已是现成入口）。
+- 重连重认证：seat reservation / reconnect 路径 + 重连后重放 `farm_refresh`。
+- Redis/PG 故障与优雅退出：renew 失败的排空语义、`gracefullyShutdown` 排空策略。
+- 双进程矩阵（T5）：真实 OS 进程 + RedisDriver 的接管演练。

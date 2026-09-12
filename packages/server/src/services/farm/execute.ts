@@ -17,7 +17,7 @@
  * persisted receipt instead of executing fresh.
  */
 
-import type { ErrorCode, PlotState, PlayerSave } from '@farm-game/shared';
+import type { ErrorCode, PlotState, PlayerSave, CommandResponse } from '@farm-game/shared';
 import type { EntityManager } from '@mikro-orm/core';
 import { MikroORMPlayerRepo } from '../../repositories/MikroORMPlayerRepo.js';
 import type { TransactionRunner } from '../../repositories/transaction.js';
@@ -94,3 +94,27 @@ export async function executeCommand<TBody, TPayload>(
 }
 
 export type { PlotState };
+
+/**
+ * Project a successful ExecuteResult into the public `CommandResponse` shape.
+ * Shared by the HTTP routes and the WS room so both transports cannot drift.
+ * Callers must guarantee a success outcome — `player` is always populated
+ * then; a null player on success is an executeCommand invariant violation.
+ */
+export function toCommandResponse<TPayload>(
+  operationId: string,
+  result: ExecuteResult<TPayload>,
+): CommandResponse<TPayload> {
+  if (!result.player) {
+    throw new Error('player state unavailable for successful command projection');
+  }
+  return {
+    operationId,
+    serverNow: result.serverNow,
+    revision: result.revision,
+    operationRevision: result.operationRevision,
+    replayed: result.replayed,
+    player: result.player,
+    ...(result.payload !== undefined ? { payload: result.payload } : {}),
+  };
+}

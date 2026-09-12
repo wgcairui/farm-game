@@ -25,7 +25,8 @@ import { harvestCommand } from '../services/farm/harvest.js';
 import { plantCommand } from '../services/farm/plant.js';
 import { unlockCommand } from '../services/farm/unlock.js';
 import { waterCommand } from '../services/farm/water.js';
-import { executeCommand } from '../services/farm/execute.js';
+import { executeCommand, toCommandResponse } from '../services/farm/execute.js';
+import { logger } from '../obs/logger.js';
 
 interface FarmRoutesDeps {
   repo: PlayerRepo;
@@ -188,21 +189,17 @@ function projectResponse<TPayload>(
     reply.code(businessHttpStatus(result.code));
     return { ok: false, code: result.code ?? ErrorCode.BAD_REQUEST, message: result.message ?? 'command failed' };
   }
-  if (!result.player) {
-    // executeCommand guarantees a non-null player on success outcomes; this
-    // branch is a defensive guard, not an expected path.
+  // Shared with the WS room projection (services/farm/execute.ts) so the two
+  // transports cannot drift; throws only on an executeCommand invariant
+  // violation, which surfaces as an INTERNAL 500 below.
+  let data: CommandResponse<TPayload>;
+  try {
+    data = toCommandResponse(meta.operationId, result);
+  } catch (err) {
+    logger.error({ err }, 'command response projection failed');
     reply.code(500);
     return { ok: false, code: ErrorCode.INTERNAL, message: 'player state unavailable' };
   }
-  const data: CommandResponse<TPayload> = {
-    operationId: meta.operationId,
-    serverNow: result.serverNow,
-    revision: result.revision,
-    operationRevision: result.operationRevision,
-    replayed: result.replayed,
-    player: result.player,
-    ...(result.payload !== undefined ? { payload: result.payload } : {}),
-  };
   return { ok: true, data };
 }
 
