@@ -79,3 +79,5 @@ android/app/build/
 # Drizzle / MikroORM migrations cache（保留源文件，忽略运行产物）
 .mikro-orm-cache/
 .drizzle/
+# Node 诊断报告（--report-signal 产物）
+report.*.json

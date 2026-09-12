@@ -72,12 +72,14 @@ function recalcOnLogin(plot: PlotState): PlotState {
 
 ## 5. 重连与房间状态重发
 
-Colyseus `allowReconnection: 30s` 内：
-1. 客户端 SDK 自动重连；客户端业务代码不感知
-2. 重连成功后服务端 `room.state` 全量广播给该 client
-3. 客户端 EventBus 收到 `server_plot_updated` 批量 reconcile
+异常断线后（G2 实现，ADR-0005 D39）：
+1. 服务端 `onDrop` 提供 reconnection seat（`ROOM_RECONNECT_TTL_SEC` 默认 60s）；seat 期间房间保留租约、其余连接不受影响
+2. 客户端用 reconnection token 重连（不重跑 onAuth）；房间**没有** Colyseus room.state——重连后客户端发 `farm_refresh` 拉全量快照（`welcome`）
+3. 客户端 EventBus 按快照 `revision` reconcile 本地状态；快照之外的增量仍走 `plot_updated`/`gold_updated` 广播
 
-窗口外（>30s）则视为新会话，走完整 `hello` → `welcome` 流程。
+窗口外（seat 过期）则视为新会话：重新 joinOrCreate（onAuth 重新验证），再 `farm_refresh`。
+
+HTTP 入口的写入（另一台设备走 REST）由 WS 进程的 revision watcher（`REFRESH_POLL_MS` 默认 1s）检测并以 `welcome` 广播推给在线客户端——客户端同样按 revision 去重。
 
 ## 6. 离线写合并
 

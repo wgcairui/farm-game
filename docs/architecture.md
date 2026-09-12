@@ -155,28 +155,28 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 - **生产启动 fail-closed**：默认 secret 在 production 启动时抛 `ConfigError`；`ENABLE_MOCK_AUTH=1` 在 production 启动时抛 `ConfigError`
 - **Mock 隔离**：mock login 仅在 `NODE_ENV ∈ {development, test}` + 显式 `ENABLE_MOCK_AUTH=1` 时启用
 
-## 9. 当前 Phase 2 G0 已落地 vs 计划中
+## 9. 当前 Phase 2 G0–G2 已落地 vs 计划中
+
+> 2026-09-12 更新。逐阶段细节见 [progress-phase2.md](./progress-phase2.md)，决策见 [ADR-0001–0005](./adr/)。
 
 | 能力 | 状态 |
 |---|---|
-| pnpm monorepo（shared / server / client-mini / client-app） | ✅ 已 build |
-| `@farm-game/shared` 协议契约（HTTP/WS/Auth/ErrorCode/AuthIdentity） | ✅ 26 单测全绿 |
-| Fastify HTTP（/auth/wechat, /auth/oauth, /auth/bind, /auth/identities/me, /crop/configs, /player/info, /farm/unlock, /healthz） | ✅ 22 单测 + 14 smoke 全绿 |
-| 真实 Fastify 类型 + JSON Schema 校验 | ✅ routes 完全类型化，`any` 仅在 logger 边界一处 |
-| 标准 JWT `sub`/`iat`/`exp` + `iss`/`aud` | ✅ `app.jwt.sign/verify` 配置注入 |
-| 协议版本 426 校验 | ✅ `onRequest` hook + `x-protocol-version` |
-| Mock auth 隔离 + production fail-closed | ✅ `ConfigError` 抛错（含 JWT_TTL_SEC NaN/≤0 校验） |
-| `AuthIdentity` (server-internal) vs `AuthIdentitySummary` (公开) 分离 | ✅ 公开信封不携带 `subject`，仅 owner 经 `/auth/identities/me` 可见 |
-| `PlayerRepo` by-identity 索引原子维护（`addIdentity` / `removeIdentity` / `findIdentities`） | ✅ |
-| `applyWater` 折扣作用于"剩余时间"，6 类失败原因（含 `corrupted` 对 NaN/Infinity 拒绝） | ✅ |
-| 新错误码（TOKEN_EXPIRED=1102, OAUTH_PROVIDER_INVALID=2002, IDENTITY_ALREADY_BOUND=2003, WATER_LIMIT_REACHED=3006, PROTOCOL_VERSION_MISMATCH=1200） | ✅ |
-| 代码审查回修（subject 隐私 / 索引原子 / applyWater 硬化） | ✅ 提交 `c66d6ca` |
+| pnpm monorepo（shared / server / client-mini / client-app） | ✅ |
+| `@farm-game/shared` 协议契约（HTTP/WS/Auth/ErrorCode/协议 v2） | ✅ 31 单测 |
+| Fastify HTTP（auth / player / crop / farm/{unlock,plant,water,harvest}，JSON Schema 全类型化） | ✅ 44 server 单测 + 13 smoke |
+| **PostgreSQL 16 持久化**（MikroORM；players / auth_identities / plots / operation_receipts；PESSIMISTIC_WRITE 行锁） | ✅ G1（ADR-0003） |
+| **operationId 幂等 + revision 修订号 + serverNow 时间权威**（收据表 UNIQUE 原子判定，跨 HTTP/WS 共用） | ✅ G1（ADR-0003） |
+| **玩法闭环**（24 plots / 6 unlocked / 种植扣金 / 浇水折扣 / 收获加金 / ripe 状态） | ✅ G0.5 + G1（ADR-0002） |
+| 标准 JWT `sub`/`iat`/`exp` + `iss`/`aud`；production fail-closed | ✅ G0 |
+| **Colyseus WS 实时层（G2 完整落地）**：独立 WS 进程、FarmRoom（onAuth fast-jwt 与 HTTP 同策略 + owner 强一致）、单通道 `farm_cmd` 四命令（事务内 assertCurrent fencing）、`farm_refresh` 拉取快照、多连接广播、revision watcher 跨进程推送、seat 重连、renew 失败容忍、SIGTERM 排空、跨进程故障矩阵实测（kill -9 接管 epoch 递增 / 重启路由回既有房间 / 优雅停机释放租约） | ✅ G2 T0–T5（ADR-0004/0005） |
+| **租约仲裁**：PostgreSQL `farm_room_leases` 是农场所有权唯一权威（epoch fencing）；Redis 仅做 matchmaker 目录 + presence | ✅ G2 |
+| 双进程真实 smoke（HTTP + WS 子进程对跑） | ✅ `pnpm smoke:realtime` 9/9 |
+| 集成测试（真实 PG：G1 9 + farm-room 12 + failover 3 + lease 10） | ✅ 34/34 |
+| 单测总计（shared 31 + server 44 + client-mini 5 + client-app 7） | ✅ 87/87 |
 | `@colyseus/admin` 隔离子模块（ENABLE_ADMIN=0 默认） | ✅ 占位 + 拒绝策略 |
-| MikroORM 主库配置 + 实体 + 迁移 | ⌛ G1（ADR-0001 §6） |
-| 真实微信 jscode2session + Apple/Google id_token 验证 | ⌛ G1 |
-| Colyseus WS 房间 + 鉴权 + 重连 | ⌛ G2 |
-| 客户端接真实后端 | ⌛ G3 |
-| Cocos Creator 工程 | ⌛ G4 |
+| 真实微信 jscode2session + Apple/Google id_token 验证 | ⌛ G1.5 |
+| client-mini 接真实后端（net 层 wx.request + 自研 WS 栈、headless 读服务端权威） | ⌛ G3 |
+| Cocos Creator 真实工程 + 部署文档收口（G4） | ⌛ G4 |
 | React Native 工程（expo prebuild） | ⌛ Phase 5 |
 | 视觉规范（v25 design-preview） | ⌛ 继续走 [visual-repair-plan-v24.md](./visual-repair-plan-v24.md) |
 
