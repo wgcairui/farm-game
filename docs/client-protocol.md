@@ -209,8 +209,8 @@ interface JwtClaims {
 
 | 客户端 | HTTP | WS |
 |---|---|---|
-| 微信小游戏 | `wx.request` | `wx.connectSocket`（G3 自研 WsEnvelope 栈） |
+| 微信小游戏 | `wx.request`（经 `FarmHttpClient`） | `@colyseus/sdk 0.18.2` + `wx-compat` 适配层（底层 wx.connectSocket） |
 | iOS / Android App | `fetch` | RN `WebSocket` |
 | H5（预留） | `fetch` | 原生 `WebSocket` |
 
-HTTP 层统一通过 `@farm-game/client-app/net/api` 的 `ApiClient`。WS 层：测试/工具脚本可用 `@colyseus/sdk`（0.18.x）；**生产小游戏客户端不使用 Colyseus SDK**（运行时/包体约束），G3 按上述消息契约在 `wx.connectSocket` 上自研（需自行缓冲 pre-join 帧）。
+HTTP 层统一通过 `@farm-game/client-app/net/api` 的 `ApiClient`；小游戏走 `@farm-game/client-mini` 的 `FarmHttpClient`。WS 层：G3 实测推翻了"生产小游戏不用 Colyseus SDK"的早期结论——SDK 0.18.2 配合 `packages/client-mini/src/net/wx-compat.ts` 两项补丁（① `WebSocket.prototype.send` 把 msgpack Uint8Array 视图拷贝为 `wx.sendSocketMessage` 接受的 ArrayBuffer；② `wx.connectSocket` 守卫拒收 SDK 首选的 Node 形 `{headers}` 构造参数，逼其落回 browser 形，见 [colyseus.js#161](https://github.com/colyseus/colyseus.js/issues/161)）即可在微信运行时正常 join。"join 推送会被 SDK 丢弃"的约束下，客户端以 `farm_refresh` 拉取快照（与 §4 一致），无需自研 pre-join 帧缓冲。约束：**小游戏端代码禁用 Map/Set 迭代器协议**（DevTools「增强编译」会将其转译为含 undefined 洞的数组），统一 `.forEach` + 索引循环。详见 runbook §10。

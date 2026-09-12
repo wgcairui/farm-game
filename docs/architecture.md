@@ -1,7 +1,7 @@
 # 架构总览（Architecture Overview）
 
 > 版本：v3 · 2026-09-11
-> 状态：Phase 2 G0 已落地 + 代码审查回修完成（60 单测 / 14 smoke 全绿；提交 `1ea87ee` + `c66d6ca`）
+> 状态：Phase 2 G0→G3 已落地（HTTP/WS 后端闭环 + PostgreSQL 持久化 + 小游戏联网层 + 微信开发者工具模拟器 E2E 通过；单测 110/110；最新提交 `9ef7c24`）
 > 配套文档：[deployment.md](./deployment.md) · [client-protocol.md](./client-protocol.md) · [state-sync.md](./state-sync.md) · [admin-integration.md](./admin-integration.md) · [ADR-0001](./adr/0001-g0-contract-and-security-baseline.md) · [实施计划](./implementation-plan-phase2.md)
 
 ## 1. 系统定位
@@ -172,11 +172,13 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 | **租约仲裁**：PostgreSQL `farm_room_leases` 是农场所有权唯一权威（epoch fencing）；Redis 仅做 matchmaker 目录 + presence | ✅ G2 |
 | 双进程真实 smoke（HTTP + WS 子进程对跑） | ✅ `pnpm smoke:realtime` 9/9 |
 | 集成测试（真实 PG：G1 9 + farm-room 12 + failover 3 + lease 10） | ✅ 34/34 |
-| 单测总计（shared 31 + server 44 + client-mini 5 + client-app 7） | ✅ 87/87 |
+| 单测总计（shared 31 + server 44 + client-mini 28 + client-app 7） | ✅ 110/110 |
+| **client-mini 联网层（G3）**：FarmHttpClient（wx.request/fetch 双 transport）+ FarmRealtimeClient（**@colyseus/sdk 0.18.2** + wx-compat 适配层）+ OnlineGameApp（服务端权威 + 乐观回滚 + revision 守卫 + 退避重连） | ✅ G3（commit `9ef7c24`） |
+| **微信开发者工具模拟器 E2E**：登录 → join → 种植（−10 金）→ 30s 成熟 → 收获（+25 金），DB 断言全程一致，重编译状态保留 | ✅ G3（2026-09-12，见 runbook §10） |
 | `@colyseus/admin` 隔离子模块（ENABLE_ADMIN=0 默认） | ✅ 占位 + 拒绝策略 |
 | 真实微信 jscode2session + Apple/Google id_token 验证 | ⌛ G1.5 |
-| client-mini 接真实后端（net 层 wx.request + 自研 WS 栈、headless 读服务端权威） | ⌛ G3 |
-| Cocos Creator 真实工程 + 部署文档收口（G4） | ⌛ G4 |
+| wx transport 真机回归（wx-compat 已覆盖 send 帧与构造形；真机网络栈待实测） | ⌛ G4 |
+| 发布链路收口（包体/图集优化、上线流程、DELIVERY 追加） | ⌛ G4 |
 | React Native 工程（expo prebuild） | ⌛ Phase 5 |
 | 视觉规范（v25 design-preview） | ⌛ 继续走 [visual-repair-plan-v24.md](./visual-repair-plan-v24.md) |
 

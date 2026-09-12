@@ -1,7 +1,7 @@
 # 🎉 交付总结
 
-> 上次更新：2026-09-11（Phase 1 monorepo 骨架）
-> 本次更新：2026-09-12（**Phase 2 后端 G0→G2 全量交付：HTTP 域闭环 + PostgreSQL 持久化 + Colyseus 实时层，全部验证绿**）
+> 上次更新：2026-09-12（Phase 2 后端 G0→G2 全量交付）
+> 本次更新：2026-09-12（**Phase 2 G3 交付：小游戏联网层 + Cocos 工程 + 微信开发者工具模拟器 E2E 通过**）
 
 ## Phase 2 G0→G2 交付（2026-09-11 ~ 2026-09-12）
 
@@ -43,6 +43,33 @@ MAIN_DB_URL=postgres://farm:farm@127.0.0.1:5432/farm_game \
 ### 下一步
 
 G3（client-mini 接真实后端：`net/` wx.request + wx.connectSocket 自研 WsEnvelope 栈）→ G4（Cocos 工程联调 + 部署文档收口）→ G1.5（真实微信/Apple 验签，可与 G3 并行）。
+
+## Phase 2 G3 交付（2026-09-12）
+
+**状态：小游戏端联网层 + Cocos Creator 3.8.8 真实工程落地，微信开发者工具模拟器完整玩法闭环验收通过。commit `9ef7c24`（分支 `feat/phase2-t0-realtime-spike`，本地未 push）。**
+
+### 交付范围
+
+| 模块 | 内容 |
+|---|---|
+| `client-mini/src/net/` | HttpTransport 注入缝（fetch/wx.request）、FarmHttpClient、FarmRealtimeClient（@colyseus/sdk 0.18.2，WsEnvelope 统一解包，operationId 匹配 cmd_result/error） |
+| `client-mini/src/net/wx-compat.ts` | 微信 WebSocket 兼容层：send 帧 ArrayBuffer 化（官方文档 patch）+ Node 形构造守卫（colyseus.js#161）；必须在 SDK import 前求值 |
+| `client-mini/src/runtime/online.ts` | OnlineGameApp：服务端权威 + 乐观回滚 + revision 守卫 + 退避重连 |
+| Cocos 工程 | OnlineFarm 最小 UI（6×4 地块，EventBus 驱动）+ esbuild vendor bundle + 场景/资源；资产管线 `scripts/slice-assets.py` |
+| server | @fastify/cors（H5/浏览器调试用，生产 fail-closed） |
+| shared | EventBus.emit 迭代器协议加固（DevTools「增强编译」破坏 Map/Set 迭代器，勿回退） |
+| 测试 | net.test.ts + e2e-online.test.ts（真实双进程）；**单测 110/110**（shared 31 + server 44 + mini 28 + app 7） |
+| 文档 | cocos-runbook.md（从零到模拟器 + §10 联调坑）、deployment.md §10、README 快速开始、architecture/progress-phase2/client-protocol 状态同步 |
+
+### E2E 验收记录
+
+模拟器（iPhone 12/13，基础库 3.17.2）：登录 → join → 种胡萝卜（−10 金）→ 30s 成熟 → 收获（+25 金）；`players.gold/revision`、`plots.status` 逐步 psql 断言一致；重编译后状态保留。联调中发现并修复的三层叠加根因（wx 拒收 TypedArray 帧 / SDK Node 形 WebSocket 构造 / DevTools 增强编译破坏迭代器协议）记录于 runbook §10 与项目记忆。
+
+### 剩余
+
+真机 wx transport 回归 → 发布链路收口（图集/包体）→ G1.5 真实微信 jscode2session（需 AppID/AppSecret）。
+
+---
 
 ## Phase 1 交付（2026-09-11）
 
