@@ -176,7 +176,7 @@ async function seedPlayer(): Promise<string> {
 /** Create the room server-side (bypasses onAuth), then connect a real client (runs onAuth). */
 async function joinFarm(playerId: string): Promise<{ room: import('@colyseus/core').Room; client: SdkRoom }> {
   requireDb();
-  const room = await testServer!.createRoom('farm', { ownerId: playerId });
+  const room = await testServer!.createRoom('farm', { ownerId: playerId, token: signToken(playerId) });
   const client = await testServer!.sdk.joinById(room.roomId, { ownerId: playerId, token: signToken(playerId) });
   return { room, client };
 }
@@ -291,7 +291,7 @@ test('plant via WS → cmd_result with fresh snapshot, and real DB effects', asy
 test('a second connection in the same room receives plot_updated + gold_updated broadcasts', async () => {
   requireDb();
   const playerId = await seedPlayer();
-  const room = await testServer!.createRoom('farm', { ownerId: playerId });
+  const room = await testServer!.createRoom('farm', { ownerId: playerId, token: signToken(playerId) });
   const cA = await testServer!.sdk.joinById(room.roomId, { ownerId: playerId, token: signToken(playerId) });
   const cB = await testServer!.sdk.joinById(room.roomId, { ownerId: playerId, token: signToken(playerId) });
 
@@ -331,7 +331,7 @@ test('retrying the same operationId over WS replays the persisted receipt', asyn
 test('join is rejected for a bad token', async () => {
   requireDb();
   const playerId = await seedPlayer();
-  const room = await testServer!.createRoom('farm', { ownerId: playerId });
+  const room = await testServer!.createRoom('farm', { ownerId: playerId, token: signToken(playerId) });
   await assert.rejects(
     () => testServer!.sdk.joinById(room.roomId, { ownerId: playerId, token: 'garbage-token' }),
   );
@@ -341,7 +341,7 @@ test('join is rejected when options.ownerId does not match the token subject', a
   requireDb();
   const owner = await seedPlayer();
   const outsider = await seedPlayer();
-  const room = await testServer!.createRoom('farm', { ownerId: owner });
+  const room = await testServer!.createRoom('farm', { ownerId: owner, token: signToken(owner) });
   // Outsider's token, but the join addresses the owner's farm — onAuth must refuse.
   await assert.rejects(
     () => testServer!.sdk.joinById(room.roomId, { ownerId: owner, token: signToken(outsider) }),

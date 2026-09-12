@@ -78,8 +78,10 @@ function requireContext(): FarmRoomContext {
 export interface FarmRoomJoinOptions {
   /**
    * The farm this room serves. Used by matchmaking (`filterBy(['ownerId'])`)
-   * to route the join, then cross-checked in `onAuth` against the token
-   * subject — a client can only ever open its OWN farm room.
+   * to route the join, then cross-checked against the token subject BOTH at
+   * creation (onCreate — anti-squatting gate before the lease is acquired)
+   * and on every subsequent join (onAuth). A client can only ever open its
+   * OWN farm room.
    */
   ownerId?: unknown;
   /** Access token minted by the HTTP login (POST /auth/*). */
@@ -157,10 +159,20 @@ export class FarmRoom extends Room implements RevisionWatchedRoom {
     const ctx = requireContext();
     const { ownerId } = options;
     // 36 = the players.player_id column width (VARCHAR(36)); a JWT sub is a
-    // UUID, so anything longer is malformed. onAuth verifies ownership
-    // against the token subject before any client can interact.
+    // UUID, so anything longer is malformed.
     if (typeof ownerId !== 'string' || ownerId.length === 0 || ownerId.length > 36) {
-      throw new Error('FarmRoom requires options.ownerId (≤36 chars; verified against the JWT subject in onAuth)');
+      throw new Error('FarmRoom requires options.ownerId (≤36 chars; verified against the JWT subject)');
+    }
+
+    // Anti-squatting gate (T5 review): room creation acquires the farm's
+    // lease BEFORE any per-client auth runs, so creation itself must prove
+    // ownership first — otherwise anyone knowing a playerId could churn the
+    // victim's lease (recurring lockout windows) with unauthenticated create
+    // requests. Every subsequent join is still verified in `onAuth`.
+    const verified = verifyAccessToken(options.token, ctx.config);
+    if (verified.sub !== ownerId) {
+      logger.warn({ sub: verified.sub, requestedOwner: ownerId }, 'farm room creation rejected: owner mismatch');
+      throw new WsAuthError(ErrorCode.NOT_AUTHENTICATED, 'farm owner mismatch');
     }
 
     // Room identity = farm identity. See module doc.
@@ -196,13 +208,17 @@ export class FarmRoom extends Room implements RevisionWatchedRoom {
 
       // Room-level message dispatch: registered once, independent of the
       // (re)connecting client set. Same-owner multi-device joins all share it.
+      // The wrappers route ANY escape from the handlers into the log instead
+      // of an unhandled rejection that would kill the whole WS process.
       this.onMessage(FARM_CMD_MESSAGE, (client, raw) => {
-        // fire-and-forget: Colyseus message handlers may be async; errors are
-        // answered to the requester inside handleFarmCmd and never rethrown.
-        void this.handleFarmCmd(client, raw);
+        this.handleFarmCmd(client, raw).catch((err) => {
+          logger.error({ err, roomId: this.roomId }, 'farm_cmd handler escaped unexpectedly');
+        });
       });
       this.onMessage(FARM_REFRESH_MESSAGE, (client, raw) => {
-        void this.handleFarmRefresh(client, raw);
+        this.handleFarmRefresh(client, raw).catch((err) => {
+          logger.error({ err, roomId: this.roomId }, 'farm_refresh handler escaped unexpectedly');
+        });
       });
 
       // Renew at config.leaseRenewMs. Transient DB failures are tolerated up
@@ -261,21 +277,6 @@ export class FarmRoom extends Room implements RevisionWatchedRoom {
     // and would drop it. Clients pull the snapshot via `farm_refresh`
     // (see shared/protocol/ws.ts); the G3 raw-socket client may buffer
     // pre-join frames and use the push.
-  }
-
-  /** Pull path for the full snapshot — deterministic and reconnect-safe. */
-  private async handleFarmRefresh(client: Client, raw: unknown): Promise<void> {
-    const parsed = parseFarmRefresh(raw);
-    if (!parsed.ok) {
-      this.sendError(client, undefined, parsed.code, parsed.message);
-      return;
-    }
-    const auth = authOf(client);
-    if (!auth) {
-      this.sendError(client, undefined, ErrorCode.NOT_AUTHENTICATED, 'connection is not authenticated');
-      return;
-    }
-    await this.sendWelcome(client, auth);
   }
 
   /** Read-only full projection — a forked EM without a transaction is fine; the snapshot is advisory. */
@@ -363,18 +364,51 @@ export class FarmRoom extends Room implements RevisionWatchedRoom {
     }
   }
 
-  // ── farm_cmd ──
+  // ── farm_cmd / farm_refresh ──
 
-  private async handleFarmCmd(client: Client, raw: unknown): Promise<void> {
+  /**
+   * Shutdown-drain bookkeeping around any DB-touching message work (commands
+   * AND snapshot pulls — both run on the ORM pool that boot.close() will
+   * shut). Resolves drain waiters when the last in-flight item finishes.
+   */
+  private async trackInFlight(fn: () => Promise<void>): Promise<void> {
     inFlightCommands += 1;
     try {
-      await this.processFarmCmd(client, raw);
+      await fn();
     } finally {
       inFlightCommands -= 1;
       if (inFlightCommands === 0) {
         drainWaiters.splice(0).forEach((done) => done());
       }
     }
+  }
+
+  private handleFarmCmd(client: Client, raw: unknown): Promise<void> {
+    return this.trackInFlight(() => this.processFarmCmd(client, raw));
+  }
+
+  private handleFarmRefresh(client: Client, raw: unknown): Promise<void> {
+    return this.trackInFlight(async () => {
+      const parsed = parseFarmRefresh(raw);
+      if (!parsed.ok) {
+        this.sendError(client, undefined, parsed.code, parsed.message);
+        return;
+      }
+      const auth = authOf(client);
+      if (!auth) {
+        this.sendError(client, undefined, ErrorCode.NOT_AUTHENTICATED, 'connection is not authenticated');
+        return;
+      }
+      try {
+        await this.sendWelcome(client, auth);
+      } catch (err) {
+        // A DB blip during the snapshot read must degrade to an error reply,
+        // never escape as an unhandled rejection (the caller's .catch only
+        // guards against bugs in this handler itself).
+        logger.error({ err, roomId: this.roomId }, 'farm_refresh snapshot read failed');
+        this.sendError(client, undefined, ErrorCode.INTERNAL, 'snapshot temporarily unavailable');
+      }
+    });
   }
 
   private async processFarmCmd(client: Client, raw: unknown): Promise<void> {

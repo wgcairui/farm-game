@@ -45,4 +45,5 @@
 ## 5. 实施状态
 
 - 已实现（T3，commit 待记）：上列全部；集成测试 28/28（G1 9 + farm-room 9 + lease 10）
+- **修订（T5 review，2026-09-12）**：D33 的 owner 交叉核对扩展到**建房时（onCreate）**——matchmake create 在任何 per-client 鉴权之前运行，且建房即抢租约；为堵住"知道 playerId 的未认证客户端反复建房搅动租约"的口子，onCreate 在 acquire 之前先 verifyAccessToken + sub 核对（onAuth 对每个后续 join 仍然强制）。详见 progress §11.5。
 - 遗留到 T4：HTTP→WS 批量刷新、重连重认证、Redis/PG 故障处理；遗留到 T5：双进程矩阵

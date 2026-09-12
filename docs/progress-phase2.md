@@ -427,3 +427,13 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 
 - **G3**：client-mini 接真实后端（`net/` wx.request + wx.connectSocket 自研 WS 栈、headless 改读服务端权威）。
 - **G4**：deployment 文档收口、`architecture.md` 阶段状态更新、双进程生产启动脚本（systemd/pm2 各一份示例）。
+
+### 11.5 G2 review-fix（T3–T5 code review 收口）
+
+只读 code review 对 T3–T5 全量 diff 给出 **0 Critical** + 1 Important + 1 Minor，全部落地：
+
+- **Important：`farm_refresh` 可崩掉整个 WS 进程**——refresh 的 DB 读无兜底 catch，`void` 包装把 rejection 丢给默认行为（进程退出），且 refresh 不计入停机排空（SIGTERM 时 in-flight 的快照读会撞上已关闭连接池）。修复：`trackInFlight` 统一包裹命令与 refresh（排空语义覆盖两类 DB 工作）；refresh 内部 try/catch → 回 `error(INTERNAL)`；onCreate 的消息注册改为 `.catch()` 记日志（任何 handler 逃逸都不会再杀进程）。
+- **Minor：未认证建房可搅动租约**——matchmake create 在任何鉴权之前运行 onCreate，而 onCreate 即抢租约；知道 playerId 的客户端可反复建房制造受害者的锁出窗口。修复：onCreate 在 acquire **之前** verifyAccessToken + `sub === ownerId` 核对（ADR-0004 D33 修订）；每个后续 join 仍在 onAuth 强制验证。
+- Review 同时明确验证了 fencing（无事务上下文 fail-closed + 事务内 FOR UPDATE + epoch 四重校验）、关停顺序（Colyseus 先 dispose 房间再跑 onShutdown，租约释放发生在连接池关闭前）、watcher 乱序防护、解析健壮性与无 token 落日志——均无问题。
+
+**验证矩阵（review-fix 后）**：build ✅ / 单测 87/87 / smoke 13/13 / smoke:realtime 9/9 / 集成 **34/34**（farm-room 的 createRoom 助手补齐建房 token 以匹配新的 creation gate）。
