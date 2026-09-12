@@ -23,7 +23,8 @@ import { WebSocketTransport } from '@colyseus/ws-transport';
 import { loadConfig, ConfigError } from '../config.js';
 import { bootstrapDatabase, type ServerBootstrap } from '../bootstrap.js';
 import { createRedisInfra, type RedisInfra } from './redis.js';
-import { FarmRoom, configureFarmRoom } from './room.js';
+import { FarmRoom, activeFarmRooms, configureFarmRoom } from './room.js';
+import { RoomRevisionWatcher } from './revision-watcher.js';
 import { logger } from '../obs/logger.js';
 
 export interface WsServerHandle {
@@ -77,12 +78,24 @@ export async function buildWsServer(overrides?: {
   // across owners (T2 review #2; verified against core 0.18.12 matchmaking).
   server.define('farm', FarmRoom).filterBy(['ownerId']);
 
+  // T4: poll players.revision for active rooms so out-of-band writes (HTTP
+  // entry, another device) reach connected clients as fresh snapshots.
+  const revisionWatcher = new RoomRevisionWatcher({
+    repo: boot.dbRepo,
+    orm: boot.orm,
+    pollMs: config.refreshPollMs,
+    rooms: activeFarmRooms,
+    label: `ws-${boot.instanceId.slice(0, 8)}`,
+  });
+  revisionWatcher.start();
+
   server.onShutdown(async () => {
     logger.info({ instanceId: boot.instanceId }, 'ws server shutting down');
     // Colyseus' gracefullyShutdown already shuts the driver/presence down
     // (Server.ts calls presence.shutdown() + driver.shutdown()); closing
     // them again here produced double-quit rejections. Only DB resources
-    // are ours to release.
+    // and our own timers are ours to release.
+    revisionWatcher.stop();
     await boot.close();
   });
 

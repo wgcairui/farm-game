@@ -77,7 +77,14 @@ export type ClientFarmRefresh = WsEnvelope<'farm_refresh', null>;
 export type ClientMessage = ClientFarmCmd | ClientFarmRefresh;
 
 // ── Server → Client ──
-/** Full projection sent once per connection right after `onJoin`. */
+/**
+ * The full farm snapshot. Sent as:
+ *  - the response to a `farm_refresh` pull (addressed to the requester), and
+ *  - a broadcast to ALL connections when the room detects an out-of-band
+ *    state change (HTTP entry / another device) via revision polling.
+ * Clients must ignore a snapshot whose `player.revision` is older than the
+ * newest they already hold (ADR-0003 D18).
+ */
 export type ServerWelcome = WsEnvelope<'welcome', { serverNow: number; roomId: string; player: PlayerSave }>;
 
 /** Response to a farm command, addressed to the requester via envelope `r` = operationId. */

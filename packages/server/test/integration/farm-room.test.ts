@@ -21,6 +21,10 @@
  *  7. matchmaking reuses the same room per owner (filterBy) and separates owners
  *  8. room creation refused while another instance holds the lease; retry
  *     succeeds after release
+ * T4:
+ *  9. out-of-band write (HTTP entry) pushed to clients by the revision watcher
+ * 10. abnormal drop → reconnection seat → reconnect → farm_refresh
+ * 11. lease renew failures tolerated within budget, then disconnect + release
  *
  * Requires `pnpm db:migrate:test` (migrations 0001 + 0002) and
  * `pnpm db:up` (postgres + redis compose; redis unused here).
@@ -111,9 +115,14 @@ before(async () => {
       mainDbUrl: dbUrl,
       // Renew is deliberately slow: the fencing test takes over the lease via
       // SQL + a second "instance" pool, and must win the race against the
-      // room's own renew timer deterministically.
+      // room's own renew timer deterministically. 2×renew < ttl satisfies the
+      // T4 failure-budget validation in loadConfig.
       leaseRenewMs: 30_000,
-      leaseTtlMs: 60_000,
+      leaseTtlMs: 90_000,
+      // T4: fast revision polling so out-of-band pushes land quickly, and a
+      // short reconnection seat so pending seats never linger between tests.
+      refreshPollMs: 150,
+      roomReconnectTtlSec: 10,
       jwtSecret: 'integration-secret',
       enableAdmin: false,
     },
@@ -209,6 +218,13 @@ async function forceExpireLease(playerId: string): Promise<void> {
 
 async function leaveOnce(client: SdkRoom): Promise<void> {
   return new Promise((resolve) => client.onLeave.once(() => resolve()));
+}
+
+async function leaveOnceWithTimeout(client: SdkRoom, timeoutMs = 5000): Promise<void> {
+  return Promise.race([
+    leaveOnce(client),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('client did not leave in time')), timeoutMs)),
+  ]);
 }
 
 // ── scenarios ──
@@ -345,12 +361,16 @@ test('fencing: after a takeover by instance-B the old room refuses commands, dis
   sendCmd(client, 'water', randomUUID(), { plotIndex: 0 });
   const err = (await client.waitForMessage('error', 5000)) as { p: { code: number; message: string } };
   assert.equal(err.p.code, ErrorCode.LEASE_LOST);
-  await leaveOnce(client);
+  await leaveOnceWithTimeout(client);
 
   const row = await playerRow(playerId);
   assert.equal(row.gold, 200);
   assert.equal(row.revision, 0);
   assert.equal(await receiptCount(playerId), 0);
+
+  // NOTE: no lease-release assertion here — the row now belongs to
+  // instance-B's live takeover lease; the old room's guarded release is a
+  // no-op by design. Release-on-loss is asserted in the renew-tolerance test.
 });
 
 test('matchmaking reuses one room per owner (filterBy) and separates different owners', async () => {
@@ -377,4 +397,81 @@ test('room creation is refused while another instance holds the lease; retry aft
   await leasesB!.release(held);
   const room = await testServer!.sdk.joinOrCreate('farm', { ownerId: playerId, token: signToken(playerId) });
   assert.equal(room.roomId, playerId);
+});
+
+// ── T4: cross-process sync, reconnection, failure tolerance ──
+
+test('out-of-band state change (HTTP-entry write) is pushed to connected clients by the revision watcher', async () => {
+  requireDb();
+  const playerId = await seedPlayer();
+  const { client } = await joinFarm(playerId);
+  await pullWelcome(client); // baseline snapshot at revision 0
+
+  // An out-of-band write — exactly what an HTTP-entry command commits.
+  await poolDb!.query(
+    'UPDATE players SET gold = gold + 50, revision = revision + 1 WHERE player_id = $1',
+    [playerId],
+  );
+
+  // The watcher polls at 150ms and broadcasts a fresh full snapshot.
+  const pushed = (await client.waitForMessage('welcome', 4000)) as {
+    p: { player: PlayerSave; roomId: string };
+  };
+  assert.equal(pushed.p.roomId, playerId);
+  assert.equal(pushed.p.player.revision, 1);
+  assert.equal(pushed.p.player.gold, 250);
+});
+
+test('abnormal drop offers a reconnection seat; reconnect keeps auth and serves fresh snapshots', async () => {
+  requireDb();
+  const playerId = await seedPlayer();
+  const { room, client } = await joinFarm(playerId);
+  await pullWelcome(client);
+
+  const token = (client as unknown as { reconnectionToken: string }).reconnectionToken;
+  assert.equal(typeof token, 'string');
+
+  // Abnormal close (no LEAVE_ROOM protocol message) → server onDrop → seat.
+  await client.leave(false);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  const reconnected = await testServer!.sdk.reconnect(token);
+  assert.equal(reconnected.roomId, room.roomId);
+
+  // onAuth/onJoin are skipped on this path; the client pulls a fresh snapshot.
+  reconnected.send('farm_refresh', refreshEnv() as never);
+  const welcome = (await reconnected.waitForMessage('welcome', 5000)) as {
+    p: { player: PlayerSave };
+  };
+  assert.equal(welcome.p.player.playerId, playerId);
+
+  // The seat is consumed — the same token cannot be replayed.
+  await assert.rejects(() => testServer!.sdk.reconnect(token));
+});
+
+test('lease renew failures are tolerated within budget, then the room disconnects and releases', async () => {
+  requireDb();
+  const playerId = await seedPlayer();
+  const { room, client } = await joinFarm(playerId);
+  await pullWelcome(client);
+
+  const farmRoom = testServer!.getRoomById(room.roomId) as unknown as {
+    handleRenewResult(renewed: unknown): Promise<void>;
+  };
+
+  // First consecutive failure — tolerated, room keeps serving.
+  await farmRoom.handleRenewResult(null);
+  client.send('farm_refresh', refreshEnv() as never);
+  await client.waitForMessage('welcome', 3000);
+
+  // Second consecutive failure — budget exhausted, room stops serving.
+  await farmRoom.handleRenewResult(null);
+  await leaveOnceWithTimeout(client);
+
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const lease = await poolDb!.query(
+    'SELECT expires_at <= now() AS released FROM farm_room_leases WHERE owner_id = $1',
+    [playerId],
+  );
+  assert.equal(lease.rows[0].released, true);
 });

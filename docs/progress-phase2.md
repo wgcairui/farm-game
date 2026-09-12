@@ -346,3 +346,47 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 - 重连重认证：seat reservation / reconnect 路径 + 重连后重放 `farm_refresh`。
 - Redis/PG 故障与优雅退出：renew 失败的排空语义、`gracefullyShutdown` 排空策略。
 - 双进程矩阵（T5）：真实 OS 进程 + RedisDriver 的接管演练。
+
+---
+
+## 10. T4 — 跨进程同步、重连、故障容忍
+
+> 决策已锁入 **ADR-0005**（D38–D40）。T3 的命令/鉴权/快照路径不变，本节在其上补齐"房间外的世界变了"三类感知。
+
+### 10.1 关键决策（详见 ADR-0005）
+
+- **D38 轮询 watcher**：WS 进程每 `REFRESH_POLL_MS`（默认 1s）对活跃房间 owner 分块查询 `players.revision`，`DB revision > room.lastProjectedRevision` 时读全量快照广播 `welcome`。房间在 pull / cmd_result / 推送三处推进 `lastProjectedRevision`，推送侧 `<=` guard 防重入；选轮询而非 LISTEN/NOTIFY / Redis pub/sub 是为了零新连接生命周期、dev 无 Redis 行为一致。
+- **D39 seat 重连**：`onDrop`（非合意关闭；`CloseCode.CONSENTED=4000` 才算合意）→ `allowReconnection(client, ROOM_RECONNECT_TTL_SEC=60s)`。core 0.18.12 重连路径跳过 onAuth/onJoin 改调 `onReconnect`，`client.auth` 框架迁移（reconnection token 即能力凭证）；重连后客户端必须 `farm_refresh` 拉新快照（D35 wire 顺序问题对重连同样成立）；已消费 token 重放被拒。
+- **D40 renew 容忍预算**：连续 2 次续租失败才停止服务（预算 `2 × LEASE_RENEW_MS < LEASE_TTL_MS` 进 loadConfig 强校验）；容忍期内写命令仍被 fencing 保护；失租断开时尽力做四重 guard 释放——租约仍是己方（容忍耗尽）→ 缩短接管延迟，已被接管（fencing）→ no-op。
+
+### 10.2 改动清单
+
+- `config.ts`：`refreshPollMs` / `roomReconnectTtlSec` / `LEASE_RENEW_FAILURES_ALLOWED=2` 导出 + 预算校验；`.env.example` 同步。
+- `realtime/revision-watcher.ts`（新）：`start/stop/pollOnce`，timer unref、跳过堆积 tick、分块 IN 查询。
+- `realtime/room.ts`：活跃房间注册表（acquire 成功注册 / onDispose 注销）；`projectedRevision` + `applyExternalUpdate`；`onDrop`/`onReconnect`；`handleRenewResult`（从 interval 回调抽出，测试可白盒驱动）；`loseLease` 补 guarded 释放。
+- `realtime/serve.ts`：watcher 装配（boot 时 start、onShutdown 时 stop）。
+- `shared/protocol/ws.ts`：`welcome` 文档更新（pull 响应 + 外部变更广播双来源，按 revision 去重）。
+
+### 10.3 新增集成测试（`farm-room.test.ts`，累计 12 项）
+
+- **外部变更推送**：SQL 模拟 HTTP 提交（gold+50, revision+1）→ 150ms watcher tick → 客户端收到 `welcome`（revision=1, gold=250）。
+- **异常断线重连**：`leave(false)`（裸 close，非 4000）→ onDrop 建 seat → `sdk.reconnect(token)` → roomId 一致、`farm_refresh` 拿到新快照、同 token 二次重连被拒。
+- **renew 容忍**：白盒 `handleRenewResult(null)` ×1 → 房间继续服务（farm_refresh 正常）；×2 → 断开 + 租约释放（`expires_at <= now()`）。
+- **fencing 回归修正**：接管后租约行属新持有者，旧房间 guarded 释放为 no-op 属预期（T3 版断言此处有误，已改）。
+
+**架构发现**：`@colyseus/core` 的 `matchMaker` 是进程级全局单例（第二个 `new Server()` 会覆盖全局 driver），且 `configureFarmRoom` 为模块级注入——单测试进程只能承载一个房间上下文，故 renew 容忍用白盒驱动而非第二 server + 真实快 tick（避免与 fencing 测试的时序假设互斥）。
+
+### 10.4 验证矩阵（T4 后，真实 PG + 真实 transport）
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测 | ✅ 87/87（server 44） |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG（G1 9 + farm-room 12 + 租约 10） | ✅ **31/31** |
+
+### 10.5 T5 需要接手的点
+
+- 真实 OS 进程双实例矩阵（RedisDriver）：kill -9 实例 A → B 接管 epoch 递增 → A 的客户端重连到 B；A 复活后建房被拒直到租约过期。
+- 排空语义：SIGTERM 后停止接受新 join、存量命令限期排空。
+- 真实 smoke 扩展：HTTP+WS 双进程对跑。

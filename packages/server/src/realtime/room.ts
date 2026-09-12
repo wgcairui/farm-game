@@ -39,7 +39,8 @@ import { MikroORM } from '@mikro-orm/core';
 import { RoomLeaseRepo, LeaseConflictError, LeaseLostError, type RoomLease } from '../repositories/room-lease-repo.js';
 import { MikroORMPlayerRepo } from '../repositories/MikroORMPlayerRepo.js';
 import type { TransactionRunner } from '../repositories/transaction.js';
-import type { ServerConfig } from '../config.js';
+import { LEASE_RENEW_FAILURES_ALLOWED, type ServerConfig } from '../config.js';
+import type { PlayerSave } from '@farm-game/shared';
 import { verifyAccessToken, WsAuthError } from '../auth/verify.js';
 import { unlockCommand } from '../services/farm/unlock.js';
 import { plantCommand } from '../services/farm/plant.js';
@@ -48,6 +49,7 @@ import { harvestCommand } from '../services/farm/harvest.js';
 import { executeCommand, toCommandResponse, type ExecuteResult } from '../services/farm/execute.js';
 import type { CommandOutcome } from '../services/farm/outcome.js';
 import { FARM_CMD_MESSAGE, FARM_REFRESH_MESSAGE, parseFarmCmd, parseFarmRefresh, serverEnvelope } from './ws-messages.js';
+import type { RevisionWatchedRoom } from './revision-watcher.js';
 import { logger } from '../obs/logger.js';
 
 export interface FarmRoomContext {
@@ -94,12 +96,39 @@ function authOf(client: Client): FarmAuth | null {
   return auth && typeof auth.playerId === 'string' ? { playerId: auth.playerId } : null;
 }
 
-export class FarmRoom extends Room {
+// ── active room registry (T4) ──
+// The revision watcher polls the owners of these rooms once per tick.
+// Rooms register after the lease is acquired and unregister on dispose.
+const activeRooms = new Set<FarmRoom>();
+
+/** Live snapshot of active farm rooms — consumed by the revision watcher. */
+export function activeFarmRooms(): FarmRoom[] {
+  return Array.from(activeRooms);
+}
+
+export class FarmRoom extends Room implements RevisionWatchedRoom {
   // Same-owner multi-device reconnect cap.
   override maxClients = 4;
 
   private lease: RoomLease | null = null;
   private renewHandle: { clear(): void } | null = null;
+  /** Consecutive lease-renew failures tolerated before the room stops serving. */
+  private renewFailures = 0;
+  /**
+   * Highest `players.revision` this room has projected to its clients — the
+   * dedup key for the external-change watcher. -1 until the first snapshot.
+   */
+  private projectedRevision = -1;
+
+  /** RevisionWatchedRoom — the farm this room serves. */
+  get ownerId(): string {
+    return this.roomId;
+  }
+
+  /** RevisionWatchedRoom — dedup key read by the revision watcher. */
+  get lastProjectedRevision(): number {
+    return this.projectedRevision;
+  }
 
   override async onCreate(options: FarmRoomJoinOptions): Promise<void> {
     const ctx = requireContext();
@@ -140,6 +169,7 @@ export class FarmRoom extends Room {
         { ownerId, roomId: this.roomId, instanceId: ctx.instanceId, epoch: this.lease.epoch },
         'farm room lease acquired',
       );
+      activeRooms.add(this);
 
       // Room-level message dispatch: registered once, independent of the
       // (re)connecting client set. Same-owner multi-device joins all share it.
@@ -152,29 +182,23 @@ export class FarmRoom extends Room {
         void this.handleFarmRefresh(client, raw);
       });
 
-      // Renew at config.leaseRenewMs. On loss (expired/taken over) the room
-      // MUST stop acting as an authority — disconnect everyone and dispose;
-      // the surviving instance rebuilds from PostgreSQL. (Full fault handling
-      // and drain semantics land in T4.)
+      // Renew at config.leaseRenewMs. Transient DB failures are tolerated up
+      // to LEASE_RENEW_FAILURES_ALLOWED consecutive misses (the budget
+      // N × leaseRenewMs < leaseTtlMs is enforced in loadConfig) — writes
+      // stay fenced by assertCurrent the whole time. At N the room stops
+      // serving; the surviving instance rebuilds from PostgreSQL. (Drain
+      // semantics across processes land in T5.)
       this.renewHandle = this.clock.setInterval(async () => {
         if (!this.lease) return;
         const renewed = await ctx.leases.renew(this.lease).catch((err) => {
           logger.error({ err, ownerId: this.roomId }, 'farm room lease renew failed');
           return null;
         });
-        if (!renewed) {
-          logger.error({ ownerId: this.roomId, instanceId: ctx.instanceId }, 'farm room lease lost; disconnecting');
-          this.lease = null;
-          this.stopRenew();
-          await this.disconnect().catch((err) => {
-            logger.warn({ err, ownerId: this.roomId }, 'disconnect after lease loss failed');
-          });
-          return;
-        }
-        this.lease = renewed;
+        await this.handleRenewResult(renewed);
       }, ctx.config.leaseRenewMs);
     } catch (err) {
       this.stopRenew();
+      activeRooms.delete(this);
       const leaseToRelease = this.lease;
       this.lease = null;
       await ctx.leases.release(leaseToRelease).catch(() => undefined);
@@ -240,19 +264,67 @@ export class FarmRoom extends Room {
       client.leave();
       return;
     }
+    this.noteProjected(player.revision);
     client.send(
       'welcome',
       serverEnvelope('welcome', { serverNow: Date.now(), roomId: this.roomId, player }),
     );
   }
 
+  /**
+   * External-change delivery (called by the revision watcher): broadcast a
+   * fresh full snapshot to every connection. The watcher only calls this when
+   * the DB revision moved; the guard keeps a slow materialisation from
+   * overwriting a newer room-command projection.
+   */
+  applyExternalUpdate(player: PlayerSave): void {
+    if (player.revision <= this.projectedRevision) return;
+    this.noteProjected(player.revision);
+    logger.debug({ roomId: this.roomId, revision: player.revision }, 'broadcasting out-of-band state change');
+    this.broadcast('welcome', serverEnvelope('welcome', { serverNow: Date.now(), roomId: this.roomId, player }));
+  }
+
+  private noteProjected(revision: number): void {
+    if (revision > this.projectedRevision) {
+      this.projectedRevision = revision;
+    }
+  }
+
   override onLeave(_client: Client, _code: number): void {
-    // Multi-connection rooms keep serving; per-device bookkeeping is T4
-    // (reconnect/resume). Nothing to release — auth data dies with the client.
+    // Consented leaves get no reconnection seat — the client chose to go.
+    // Multi-connection rooms keep serving; per-device bookkeeping is G3+.
+  }
+
+  /**
+   * Network drop / abnormal close (any non-consented close code routes here
+   * instead of onLeave — core 0.18.12 `_onLeave`). Offer a reconnection seat:
+   * the room keeps its lease and keeps serving remaining connections while
+   * the seat is pending. The reconnecting client re-enters WITHOUT re-running
+   * onAuth (the reconnection token is the capability issued to the
+   * authenticated client) and lands in `onReconnect`.
+   */
+  override async onDrop(client: Client, code?: number): Promise<void> {
+    const ctx = requireContext();
+    await this.allowReconnection(client, ctx.config.roomReconnectTtlSec).catch(() => {
+      // Seat expired without a reconnect — room drains via autoDispose.
+      logger.debug({ roomId: this.roomId, code: code ?? null }, 'reconnection seat expired');
+    });
+  }
+
+  /**
+   * Reconnect completion — onAuth/onJoin are SKIPPED on this path (core
+   * 0.18.12), `client.auth` is restored by the framework. The client pulls a
+   * fresh snapshot via `farm_refresh` (the join-time push ordering issue
+   * applies to reconnection too).
+   */
+  override async onReconnect(client: Client): Promise<void> {
+    const auth = authOf(client);
+    logger.info({ roomId: this.roomId, playerId: auth?.playerId ?? null }, 'farm client reconnected');
   }
 
   override async onDispose(): Promise<void> {
     this.stopRenew();
+    activeRooms.delete(this);
     const ctx = requireContext();
     if (this.lease) {
       const lease = this.lease;
@@ -310,6 +382,7 @@ export class FarmRoom extends Room {
       });
 
       if (result.ok) {
+        this.noteProjected(result.revision);
         client.send('cmd_result', serverEnvelope('cmd_result', toCommandResponse(operationId, result), operationId));
         this.broadcastCommandEffects(result);
       } else {
@@ -351,12 +424,51 @@ export class FarmRoom extends Room {
   }
 
   /**
-   * Stop acting as the authority: drop the lease handle, stop renewing, and
-   * disconnect every client so they re-route to the surviving instance.
+   * Renew outcome handling (T4): tolerate up to LEASE_RENEW_FAILURES_ALLOWED
+   * consecutive failures — a transient DB blip must not kill rooms — then
+   * stop serving. Extracted from the interval callback so tests can drive it
+   * deterministically without waiting real ticks.
+   */
+  private async handleRenewResult(renewed: RoomLease | null): Promise<void> {
+    if (renewed) {
+      this.renewFailures = 0;
+      this.lease = renewed;
+      return;
+    }
+    this.renewFailures += 1;
+    const ctx = requireContext();
+    if (this.renewFailures >= LEASE_RENEW_FAILURES_ALLOWED) {
+      logger.error(
+        { ownerId: this.roomId, instanceId: ctx.instanceId, renewFailures: this.renewFailures },
+        'farm room lease lost; disconnecting',
+      );
+      await this.loseLease();
+    } else {
+      logger.warn(
+        { ownerId: this.roomId, renewFailures: this.renewFailures },
+        'farm room lease renew failed; tolerating within budget',
+      );
+    }
+  }
+
+  /**
+   * Stop acting as the authority: stop renewing, best-effort release the
+   * lease, and disconnect every client so they re-route to the surviving
+   * instance. The release is four-way guarded (owner/room/instance/epoch):
+   * it shortens takeover latency when the lease is still ours
+   * (tolerance-exhaustion case) and is a no-op when another instance already
+   * took over (fencing case — the row belongs to the new holder).
    */
   private async loseLease(): Promise<void> {
-    this.lease = null;
     this.stopRenew();
+    const lease = this.lease;
+    this.lease = null;
+    if (lease) {
+      const ctx = requireContext();
+      await ctx.leases.release(lease).catch((err) => {
+        logger.warn({ err, ownerId: this.roomId }, 'lease release on loss failed');
+      });
+    }
     await this.disconnect().catch((err) => {
       logger.warn({ err, ownerId: this.roomId }, 'disconnect after lease loss failed');
     });

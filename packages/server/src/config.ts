@@ -28,9 +28,29 @@ export interface ServerConfig {
   /**
    * Farm room ownership lease (PostgreSQL-arbitrated). The lease must
    * outlive the renew interval with comfortable margin for GC pauses.
+   * T4: renew failures are tolerated up to LEASE_RENEW_FAILURES_ALLOWED
+   * consecutive misses, so the budget constraint is
+   * `leaseRenewMs * LEASE_RENEW_FAILURES_ALLOWED < leaseTtlMs`.
    */
   leaseTtlMs: number;
   leaseRenewMs: number;
+
+  /**
+   * T4: how often the WS process polls `players.revision` for its active
+   * farm rooms to detect out-of-band writes (HTTP entry, another device).
+   * Detected changes are broadcast to the room's connections as a fresh
+   * full snapshot. Latency budget: ≤ pollMs + one snapshot read.
+   */
+  refreshPollMs: number;
+
+  /**
+   * T4: reconnection seat TTL offered in `onDrop` (network drop / abnormal
+   * close). While a seat is pending the room keeps its lease and keeps
+   * serving the remaining connections; a reconnecting client re-enters
+   * without re-running onAuth (the reconnection token is the capability)
+   * and must pull a fresh snapshot via `farm_refresh`.
+   */
+  roomReconnectTtlSec: number;
 
   /** Main business database (MikroORM). Phase 1 unused; placeholder. */
   mainDbUrl: string | null;
@@ -60,6 +80,16 @@ const DEFAULT_JWT_SECRET = 'dev-secret-change-me';
 const DEFAULT_JWT_SECRET_ADMIN = 'dev-admin-secret-change-me';
 const DEFAULT_SESSION_SECRET = 'dev-session-change-me';
 
+/**
+ * Consecutive lease-renew failures tolerated before a room stops serving.
+ * The room keeps acting as authority while failures < N (writes stay fenced
+ * by assertCurrent regardless); at N it disconnects and releases. The budget
+ * `N * leaseRenewMs` must stay below the lease TTL, otherwise a partitioned
+ * room could still be serving after its lease has expired and been taken
+ * over — the fence would reject writes, but the room would be a zombie.
+ */
+export const LEASE_RENEW_FAILURES_ALLOWED = 2;
+
 export class ConfigError extends Error {
   constructor(msg: string) {
     super(msg);
@@ -87,12 +117,14 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   const enableAdmin = process.env.ENABLE_ADMIN === '1';
   const enableMockAuth = process.env.ENABLE_MOCK_AUTH === '1';
 
-  // Realtime WS entry (G2 T2).
+  // Realtime WS entry (G2 T2/T4).
   const wsPort = Number(process.env.WS_PORT ?? '2567');
   const wsHost = process.env.WS_HOST ?? '127.0.0.1';
   const redisUrl = process.env.REDIS_URL || null;
   const leaseTtlMs = Number(process.env.LEASE_TTL_MS ?? '15000');
   const leaseRenewMs = Number(process.env.LEASE_RENEW_MS ?? '5000');
+  const refreshPollMs = Number(process.env.REFRESH_POLL_MS ?? '1000');
+  const roomReconnectTtlSec = Number(process.env.ROOM_RECONNECT_TTL_SEC ?? '60');
   if (!Number.isFinite(wsPort) || wsPort <= 0) {
     throw new ConfigError(`WS_PORT must be a positive integer (received ${process.env.WS_PORT ?? '<unset>'}).`);
   }
@@ -104,6 +136,21 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   if (leaseRenewMs >= leaseTtlMs) {
     throw new ConfigError(
       `LEASE_RENEW_MS (${leaseRenewMs}) must be shorter than LEASE_TTL_MS (${leaseTtlMs}) or leases expire between renewals.`,
+    );
+  }
+  if (leaseRenewMs * LEASE_RENEW_FAILURES_ALLOWED >= leaseTtlMs) {
+    throw new ConfigError(
+      `LEASE_RENEW_MS (${leaseRenewMs}) × LEASE_RENEW_FAILURES_ALLOWED (${LEASE_RENEW_FAILURES_ALLOWED}) must stay below LEASE_TTL_MS (${leaseTtlMs}) — otherwise a partitioned room outlives its own lease.`,
+    );
+  }
+  if (!Number.isFinite(refreshPollMs) || refreshPollMs < 50) {
+    throw new ConfigError(
+      `REFRESH_POLL_MS must be a number ≥ 50 (received ${process.env.REFRESH_POLL_MS ?? '<unset>'}).`,
+    );
+  }
+  if (!Number.isFinite(roomReconnectTtlSec) || roomReconnectTtlSec <= 0 || roomReconnectTtlSec > 3600) {
+    throw new ConfigError(
+      `ROOM_RECONNECT_TTL_SEC must be a number in (0, 3600] (received ${process.env.ROOM_RECONNECT_TTL_SEC ?? '<unset>'}).`,
     );
   }
 
@@ -160,6 +207,8 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     redisUrl,
     leaseTtlMs,
     leaseRenewMs,
+    refreshPollMs,
+    roomReconnectTtlSec,
     mainDbUrl: process.env.MAIN_DB_URL ?? null,
     adminDbUrl: process.env.ADMIN_DB_URL ?? null,
     jwtSecret,
