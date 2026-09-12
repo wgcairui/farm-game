@@ -28,10 +28,15 @@ class EventBusImpl {
   emit<T = unknown>(event: string, arg?: T): void {
     const set = this._listeners.get(event);
     if (!set) return;
-    // Snapshot to allow off() during dispatch.
-    for (const handler of [...set]) {
+    // Snapshot to allow off() during dispatch. Set.forEach callback rather
+    // than iterator spread — the WeChat DevTools' babel "enhance" transpile
+    // turns `[...set]` / `[...map.entries()]` into arrays with undefined
+    // holes, which crashed every emit in the minigame simulator.
+    const snapshot: Handler<any>[] = [];
+    set.forEach((handler) => snapshot.push(handler));
+    for (let i = 0; i < snapshot.length; i += 1) {
       try {
-        handler(arg);
+        snapshot[i](arg);
       } catch (err) {
         // Phase 1: log and continue; production wires pino.
         // eslint-disable-next-line no-console

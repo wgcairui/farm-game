@@ -38,6 +38,7 @@
     "@colyseus/ws-transport": "^0.18.2",
     "@farm-game/client-app": "workspace:*",
     "@farm-game/shared": "workspace:*",
+    "@fastify/cors": "^11.3.0",
     "@fastify/jwt": "^10.2.2",
     "@mikro-orm/core": "^6.2.0",
     "@mikro-orm/migrations": "^6.2.0",

@@ -17,8 +17,9 @@
     "lint:tsc": "tsc -b packages/shared packages/server packages/client-mini packages/client-app"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
+    "@types/node": "^20.14.10",
+    "miniprogram-automator": "^0.12.1",
     "tsx": "^4.19.2",
-    "@types/node": "^20.14.10"
+    "typescript": "^5.5.4"
   }
 }

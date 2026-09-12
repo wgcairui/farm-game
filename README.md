@@ -44,6 +44,63 @@ pnpm -r test                       # shared 15 + server 7 + client-mini 5 + clie
 pnpm smoke                         # 13/13 协议校验通过
 ```
 
+## 本地联调快速开始（G3）
+
+跑通 client-mini / curl / 微信开发者工具到本地后端的端到端联调。**前提**：本机有 Docker（db:up 起 PostgreSQL + Redis 用）。
+
+### 起后端（三个终端）
+
+```bash
+# 终端 1：起 PostgreSQL + Redis，并跑迁移
+pnpm --filter @farm-game/server db:up
+pnpm --filter @farm-game/server db:migrate
+
+# 终端 2：HTTP 入口
+pnpm --filter @farm-game/server dev          # http://127.0.0.1:3000
+
+# 终端 3：WS 入口（独立进程，共享同一 PostgreSQL）
+pnpm --filter @farm-game/server dev:ws       # ws://127.0.0.1:2567
+```
+
+### curl 跑通 mock 登录
+
+```bash
+curl -X POST http://127.0.0.1:3000/auth/wechat \
+  -H 'content-type: application/json' \
+  -d '{"code":"mock_dev_1"}'
+```
+
+返回示例（节选）：
+
+```json
+{
+  "ok": true,
+  "data": {
+    "token": "eyJhbGciOi...",
+    "player": { "playerId": "p_8c2a...", "revision": 1, ... },
+    "auth": { "playerId": "p_8c2a...", "issuedAt": 1762970000, "expiresAt": 1763574800 }
+  }
+}
+```
+
+- `token`：JWT，后续所有 `/player/*` `/farm/*` 请求在 `Authorization: Bearer <token>` 里带；
+- `player.playerId`：玩家唯一 id，client-mini 入参 / 日志关联用；
+- 重复用同一个 `code` 会复用同一玩家（`ensurePlayer` 幂等）。
+
+### client-mini 网络层 e2e
+
+```bash
+pnpm --filter @farm-game/client-mini test   # 需 db:up（依赖 server 真实端口）
+```
+
+### 微信开发者工具联调
+
+打开微信开发者工具 → 导入 `packages/client-mini` 的 Cocos 构建产物 → 右上角「详情 → 本地设置」：
+
+- 勾选 **「不校验合法域名」**（开发期直连本地）；
+- 项目设置里把请求域名改为 `http://127.0.0.1:3000`、WS 域名改为 `ws://127.0.0.1:2567`；
+- 真机预览时需把 PC 上的 3000/2567 端口通过工具自带的「内网穿透」或本机 `nginx -tcp` 转发给手机。
+
 ## 客户端矩阵
 
 | 客户端 | 阶段 | 启动方式 |
