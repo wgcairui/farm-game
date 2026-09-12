@@ -24,7 +24,7 @@ sprites/
 │   ├── plots/          # L8 地块 6 件套（locked/grass/tilled + 湿土/成熟/选中覆盖）
 │   ├── crops/          # L9 作物 5 种 × 4 阶段（stage1 播种 → stage4 成熟）
 │   ├── icons/          # L10/L11 图标（种子袋、水壶、金币、锁牌等）
-│   ├── scene-modules/  # L3–L7 场景拼装件（建筑/水域/道路/树/山/云）
+│   ├── scene-modules/  # L2–L7 场景拼装件（视差条/建筑/水域/道路/灌木）
 │   ├── effects/        # L10 特效帧序列（待批次 C）
 │   └── ui/             # L11/L12 UI 套件（待批次 H）
 └── …（旧版本目录原样保留）
