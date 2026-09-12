@@ -390,3 +390,40 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 - 真实 OS 进程双实例矩阵（RedisDriver）：kill -9 实例 A → B 接管 epoch 递增 → A 的客户端重连到 B；A 复活后建房被拒直到租约过期。
 - 排空语义：SIGTERM 后停止接受新 join、存量命令限期排空。
 - 真实 smoke 扩展：HTTP+WS 双进程对跑。
+
+---
+
+## 11. T5 — 双进程故障矩阵、排空、真实 smoke（G2 收口）
+
+> 决策补充在 **ADR-0005 §6**（D41–D43）。本轮全部在真实 OS 进程 + 真实 Redis 目录上验证。
+
+### 11.1 交付内容
+
+- **排空（D41）**：`handleFarmCmd` 维护进程级 in-flight 计数，`onShutdown` 先 `drainActiveCommands(3000ms)` 再关 ORM——消除"停机时正提交的命令撞上已关闭连接池"的窗口。
+- **跨进程路由（D42）**：`publicAddress: host:port`（不带 scheme）。实测发现 0.18 的 matchmake `create` 经 IPC 转发到目录内随机活跃进程，SDK 依响应里的 `publicAddress` 连接真实宿主；带 scheme 的值会拼出 `ws://ws://…` 并 1006 断连。
+- **故障矩阵（`test/integration/failover.test.ts`，3 场景，D43 动态所有权发现）**：
+  - kill -9 租约持有者 → 幸存者 TTL 后接管（**实测 epoch 1→2**）→ 新客户端落到幸存者房间，A 时代种的作物经 DB 权威保留、命令路径完整可用；
+  - 被杀进程重启 → joinOrCreate 经共享 Redis 目录 + publicAddress 路由回既有房间（零接管，epoch/instance 不变），双连接广播互通；
+  - SIGTERM 持有者 → exit 0 + 客户端收 `SERVER_SHUTDOWN(4001)` + 租约立即释放（不等 TTL）。
+- **真实 smoke（`scripts/smoke-realtime.ts`，`pnpm smoke:realtime`）**：HTTP+WS 双真实进程对跑 9 步——预检（PG+Redis）→ 双进程起 → HTTP 登录 → WS join+farm_refresh → WS 命令 → HTTP 读取核对 → HTTP 写 → WS 拉取可见 → SIGTERM 排空停机。
+
+### 11.2 调试记录（对本仓库后续有复用价值）
+
+- `waitForMessage` 等 SDK Room 扩展来自 `@colyseus/testing` 的 Room.ext monkey-patch——直接 import `@colyseus/sdk` 的脚本/测试必须显式 `import '@colyseus/testing'`（本轮 smoke 与 failover 各踩一次）。
+- matchmake create 的 IPC 转发 + 死进程目录残留 → `ipc_timeout: create room request timed out`，join 重试需覆盖 ~2s TTL + IPC 超时的窗口（25s deadline）。
+- node --test 的子进程隔离会缓冲 stderr；子进程（serve.ts）的生命周期日志镜像到测试输出是排障关键。
+
+### 11.3 验证矩阵（T5 后 = G2 完成态）
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测 | ✅ 87/87（server 44） |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
+| `pnpm --filter @farm-game/server smoke:realtime` | **双真实进程** HTTP+WS 对跑 | ✅ **9/9** |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG（G1 9 + farm-room 12 + failover 3 + 租约 10） | ✅ **34/34** |
+
+### 11.4 G2 之后
+
+- **G3**：client-mini 接真实后端（`net/` wx.request + wx.connectSocket 自研 WS 栈、headless 改读服务端权威）。
+- **G4**：deployment 文档收口、`architecture.md` 阶段状态更新、双进程生产启动脚本（systemd/pm2 各一份示例）。

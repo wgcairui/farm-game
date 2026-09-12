@@ -23,9 +23,15 @@ import { WebSocketTransport } from '@colyseus/ws-transport';
 import { loadConfig, ConfigError } from '../config.js';
 import { bootstrapDatabase, type ServerBootstrap } from '../bootstrap.js';
 import { createRedisInfra, type RedisInfra } from './redis.js';
-import { FarmRoom, activeFarmRooms, configureFarmRoom } from './room.js';
+import { FarmRoom, activeFarmRooms, configureFarmRoom, drainActiveCommands } from './room.js';
 import { RoomRevisionWatcher } from './revision-watcher.js';
 import { logger } from '../obs/logger.js';
+
+/**
+ * Deadline for waiting out in-flight farm commands during shutdown. Bounded
+ * so a stuck DB transaction delays exit by at most this long.
+ */
+const DRAIN_DEADLINE_MS = 3_000;
 
 export interface WsServerHandle {
   port: number;
@@ -69,6 +75,14 @@ export async function buildWsServer(overrides?: {
 
   const server = new Server({
     transport: new WebSocketTransport(),
+    // Advertised in matchmake responses — with the shared Redis directory,
+    // a join landing on process A for a room owned by process B must send
+    // the client to B's endpoint. The SDK's buildEndpoint prepends the
+    // scheme itself, so this is host:port WITHOUT `ws://` (verified: with
+    // the scheme the client connects to `ws://ws://…` and dies with 1006).
+    // LocalDriver (dev) never crosses processes, where it simply matches
+    // the listen port.
+    publicAddress: `${config.wsHost}:${config.wsPort}`,
     ...(redis ? { driver: redis.driver, presence: redis.presence } : {}),
   });
 
@@ -91,6 +105,10 @@ export async function buildWsServer(overrides?: {
 
   server.onShutdown(async () => {
     logger.info({ instanceId: boot.instanceId }, 'ws server shutting down');
+    // Drain: Colyseus disposes rooms without awaiting their message handlers,
+    // so wait (bounded) for commands mid-transaction before closing the ORM
+    // pool — otherwise a committing command would fail on a closed pool.
+    await drainActiveCommands(DRAIN_DEADLINE_MS);
     // Colyseus' gracefullyShutdown already shuts the driver/presence down
     // (Server.ts calls presence.shutdown() + driver.shutdown()); closing
     // them again here produced double-quit rejections. Only DB resources

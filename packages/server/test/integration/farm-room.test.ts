@@ -113,6 +113,9 @@ before(async () => {
     config: {
       env: 'test',
       mainDbUrl: dbUrl,
+      // publicAddress is built from wsPort — it must equal the port the test
+      // actually listens on, or the SDK would route connections elsewhere.
+      wsPort: port,
       // Renew is deliberately slow: the fencing test takes over the lease via
       // SQL + a second "instance" pool, and must win the race against the
       // room's own renew timer deterministically. 2×renew < ttl satisfies the

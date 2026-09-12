@@ -40,3 +40,17 @@
 
 - 已实现（T4，commit 待记）：上列全部；集成 31/31（G1 9 + farm-room 12 + 租约 10），单测 87/87，smoke 13/13
 - 遗留到 T5：真实 OS 进程 + RedisDriver 双实例矩阵、drain 语义、真实 smoke 扩展
+
+## 6. T5 补充（2026-09-12）
+
+| # | 决策 | 替代方案 | 选定理由 |
+|---|---|---|---|
+| D41 | **SIGTERM 排空**：Colyseus 的 `gracefullyShutdown` 释放房间但不等待房间的异步消息 handler，命令若正处事务中途会在 `orm.close()` 后撞上已关闭连接池。`handleFarmCmd` 维护进程级 in-flight 计数，`onShutdown` 先 `drainActiveCommands(3000ms 期限)` 再关库——期限兜底防止卡死的 DB 拖住停机 | 直接关库（现状）；无限等待排空 | 3s 期限覆盖正常命令（毫秒级）；代价与收益明确 |
+| D42 | **跨进程路由依赖 `publicAddress`（host:port，不带 scheme）**：matchmake `create` 请求经 IPC 转发到目录里任意活跃进程，SDK 用响应中的 `publicAddress` 连接真正的房间宿主。带 scheme 的值会让 SDK 拼出 `ws://ws://…` 并以 1006 断连（实测踩坑） | 禁用 IPC 固定本地创建 | IPC 转发是 0.18 共享目录的既有行为；正确设置 `publicAddress` 是它的前提而非可选项 |
+| D43 | **故障矩阵测试必须动态发现房间所有权**：初始房间可能落在任意子进程上，测试读取租约行 `instance_id` 并与子进程启动日志中的 instanceId 对映，对"真正的持有者"执行 kill/SIGTERM | 假设初始房间在端口 A 的进程上（本轮首版假设，实测被 IPC 路由打穿） | 路由的随机性是生产语义的一部分，测试必须拥抱它 |
+
+### 实施状态（T5）
+
+- `realtime/room.ts`：`inFlightCommands` 计数 + `drainActiveCommands(deadline)`；`realtime/serve.ts`：`DRAIN_DEADLINE_MS=3000`、`publicAddress: host:port`
+- `test/integration/failover.test.ts`：真实 OS 进程 × 2 + RedisDriver——kill -9 持有者 → 幸存者接管（epoch 1→2 实测）→ 新客户端落到幸存者；重启进程经共享目录路由回既有房间（零接管）；SIGTERM → exit 0 + `SERVER_SHUTDOWN(4001)` + 租约释放
+- `scripts/smoke-realtime.ts`（`pnpm smoke:realtime`）：HTTP+WS 双真实进程对跑——登录 → join → WS 命令 → HTTP 读取 → HTTP 写 → WS 拉取可见 → 排空停机，9/9

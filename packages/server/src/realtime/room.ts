@@ -106,6 +106,29 @@ export function activeFarmRooms(): FarmRoom[] {
   return Array.from(activeRooms);
 }
 
+// ── in-flight command drain (T5) ──
+// Colyseus disposes rooms on shutdown without awaiting room message handlers,
+// so a command mid-transaction would hit a closed ORM pool when the process
+// exits. serve.ts awaits this counter (bounded by a deadline) before closing.
+let inFlightCommands = 0;
+const drainWaiters: Array<() => void> = [];
+
+/**
+ * Resolve when no farm command is mid-transaction (or at the deadline,
+ * whichever comes first — a stuck DB must not block shutdown forever).
+ */
+export function drainActiveCommands(deadlineMs: number): Promise<void> {
+  if (inFlightCommands === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, deadlineMs);
+    function done(): void {
+      clearTimeout(timer);
+      resolve();
+    }
+    drainWaiters.push(done);
+  });
+}
+
 export class FarmRoom extends Room implements RevisionWatchedRoom {
   // Same-owner multi-device reconnect cap.
   override maxClients = 4;
@@ -343,6 +366,18 @@ export class FarmRoom extends Room implements RevisionWatchedRoom {
   // ── farm_cmd ──
 
   private async handleFarmCmd(client: Client, raw: unknown): Promise<void> {
+    inFlightCommands += 1;
+    try {
+      await this.processFarmCmd(client, raw);
+    } finally {
+      inFlightCommands -= 1;
+      if (inFlightCommands === 0) {
+        drainWaiters.splice(0).forEach((done) => done());
+      }
+    }
+  }
+
+  private async processFarmCmd(client: Client, raw: unknown): Promise<void> {
     const ctx = requireContext();
 
     const parsed = parseFarmCmd(raw);
