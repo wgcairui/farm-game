@@ -1,0 +1,10 @@
+- success: farm-layout-candidate-01.jpeg
+- success: farm-layout-candidate-02.jpeg
+- success: farm-layout-candidate-03.jpeg
+- success: farm-layout-candidate-04.jpeg
+- success: farm-layout-candidate-05.jpeg
+- success: farm-layout-candidate-06.jpeg
+- success: farm-layout-candidate-07.jpeg
+- success: farm-layout-candidate-08.jpeg
+- success: farm-layout-candidate-09.jpeg
+- success: farm-layout-candidate-10.jpeg

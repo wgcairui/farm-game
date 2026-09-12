@@ -152,37 +152,35 @@ JWT 不再携带 `platform`；平台只出现在 HTTP `x-platform` 头，影响�
 
 ## 4. WebSocket 消息
 
-完整定义见 [`packages/shared/src/protocol/ws.ts`](../packages/shared/src/protocol/ws.ts)。
+完整定义见 [`packages/shared/src/protocol/ws.ts`](../packages/shared/src/protocol/ws.ts)（G2 版，ADR-0004）。所有消息包 WsEnvelope `{ v, t, r?, p, ts? }`，`v` 校验 major。房间**不使用 Colyseus Schema state**——PostgreSQL 是唯一权威，消息是投影；客户端按 `revision` 丢弃过期快照。
 
 ### 4.1 C → S
 
 | 名称 | payload | 语义 |
 |---|---|---|
-| `hello` | `{ playerId, token }` | 握手；服务端校验 JWT，回 `welcome` 或 `error` |
-| `plant` | `{ plotIndex, cropId }` | 种植；服务端校验金币/地块状态 |
-| `water` | `{ plotIndex }` | 浇水；服务端重新算 matureAt |
-| `harvest` | `{ plotIndex }` | 收获；服务端 push `plot_updated` |
-| `steal` | `{ victimPlayerId, plotIndex }` | 偷菜（G1+） |
+| `farm_cmd` | `{ command, operationId, body }` | **唯一写通道**。`command ∈ unlock/plant/water/harvest`，body 与 HTTP 同形状；`operationId` 幂等收据与 HTTP 共表（跨通道重放安全） |
+| `farm_refresh` | `null` | 拉取全量快照（回 `welcome`）。**这是可靠的快照路径**：join 时服务端虽会 push，但 0.18 握手在 onJoin 之后才发 JOIN_ROOM，SDK 客户端必然收不到那次 push |
 
 ### 4.2 S → C
 
 | 名称 | payload | 语义 |
 |---|---|---|
-| `welcome` | `{ serverNow, roomId }` | 握手成功；客户端计算时间偏移 |
-| `plot_updated` | `{ plot }` | 地块状态变更（种/收/偷/枯） |
-| `crop_stolen` | `{ victimPlayerId, plotIndex, cropId, lostAmount }` | 被偷通知 |
-| `gold_updated` | `{ gold }` | 金币变化 |
-| `error` | `{ code, message }` | 业务错误 |
+| `welcome` | `{ serverNow, roomId, player: PlayerSave }` | 全量快照。三种来源：`farm_refresh` 的响应（仅请求者）、join 推送（仅供缓冲 pre-join 帧的自研客户端）、**跨进程变更广播**（HTTP 入口写入后由 revision watcher 推给全体连接） |
+| `cmd_result` | `CommandResponse`（含 `player` 全量 + `payload` + `replayed`/`operationRevision`） | 命令响应；`envelope.r` 回声 operationId |
+| `plot_updated` | `{ plot }` | 命令成功后广播（全体连接） |
+| `gold_updated` | `{ gold }` | 同上 |
+| `error` | `{ code, message }` | 结构垃圾/版本不符/内部错误（ephemeral，可原 operationId 重试）或确定性业务失败（已落收据，勿重试） |
+| `crop_stolen` | — | **reserved**（社交阶段） |
 
 ### 4.3 request/response 语义
 
-`r` 字段携带请求 id。客户端 send `plant` 带 `r: "abc123"`，可同步 `await` 对应 `r === "abc123"` 的响应（Colyseus 0.18 `room.request` API，G2 启用）。
+`r` 字段携带请求 id（farm 命令即 operationId）。服务端在 `cmd_result`/`error` 上原样回声，客户端据此关联响应。
 
 ## 5. 鉴权与刷新
 
 - JWT TTL：7 天（`JWT_TTL_SEC` 默认 7×24×3600）
 - 业务路由：`Authorization: Bearer <token>`
-- WS 握手：把 JWT 放在 `hello.token`，服务端校验通过后 join/leave room
+- WS：join options `{ ownerId, token }`。**双重验证**：`onCreate`（建房即抢租约，因此创建前先验 token + `sub === ownerId`，防未认证建房搅动租约）+ `onAuth`（每个后续 join）。验证用 fast-jwt，与 HTTP 的 `@fastify/jwt` 同 secret/iss/aud（ADR-0004 D33 + T5 review 修订）
 - 刷新：G1+ 引入 `POST /auth/refresh`（rotation refresh token）
 
 ### 5.1 JWT 声明
@@ -202,17 +200,17 @@ interface JwtClaims {
 
 ## 6. 重连与离线
 
-- Colyseus `allowReconnection` 30 秒
-- 客户端在重连窗口内冻结 UI
-- 重连成功后客户端用 `hello` 重新握手，服务端 push 整个 room 状态
-- 详见 [state-sync.md §3](./state-sync.md)
+- 异常断线 → 服务端 `onDrop` 提供 reconnection seat（`ROOM_RECONNECT_TTL_SEC` 默认 60s）；seat 期间房间保留租约、其余连接继续服务
+- 重连走 reconnection token（服务端签发给已认证连接的能力凭证），**不重跑 onAuth**；`onReconnect` 后客户端必须发 `farm_refresh` 拉新快照（无 room.state 推送）
+- 合意退出（`CloseCode.CONSENTED=4000`）不给 seat；服务端 SIGTERM 关停时客户端收到 4001
+- 详见 [state-sync.md §5](./state-sync.md)
 
 ## 7. 客户端实现位置
 
 | 客户端 | HTTP | WS |
 |---|---|---|
-| 微信小游戏 | `wx.request` | `wx.connectSocket` |
+| 微信小游戏 | `wx.request`（经 `FarmHttpClient`） | `@colyseus/sdk 0.18.2` + `wx-compat` 适配层（底层 wx.connectSocket） |
 | iOS / Android App | `fetch` | RN `WebSocket` |
 | H5（预留） | `fetch` | 原生 `WebSocket` |
 
-HTTP 层统一通过 `@farm-game/client-app/net/api` 的 `ApiClient`；WS 层统一通过 Colyseus SDK 的 `Client`。
+HTTP 层统一通过 `@farm-game/client-app/net/api` 的 `ApiClient`；小游戏走 `@farm-game/client-mini` 的 `FarmHttpClient`。WS 层：G3 实测推翻了"生产小游戏不用 Colyseus SDK"的早期结论——SDK 0.18.2 配合 `packages/client-mini/src/net/wx-compat.ts` 两项补丁（① `WebSocket.prototype.send` 把 msgpack Uint8Array 视图拷贝为 `wx.sendSocketMessage` 接受的 ArrayBuffer；② `wx.connectSocket` 守卫拒收 SDK 首选的 Node 形 `{headers}` 构造参数，逼其落回 browser 形，见 [colyseus.js#161](https://github.com/colyseus/colyseus.js/issues/161)）即可在微信运行时正常 join。"join 推送会被 SDK 丢弃"的约束下，客户端以 `farm_refresh` 拉取快照（与 §4 一致），无需自研 pre-join 帧缓冲。约束：**小游戏端代码禁用 Map/Set 迭代器协议**（DevTools「增强编译」会将其转译为含 undefined 洞的数组），统一 `.forEach` + 索引循环。详见 runbook §10。

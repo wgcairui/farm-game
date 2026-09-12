@@ -4,14 +4,15 @@
 
 ## 当前状态
 
-**Phase 1 骨架已落地（2026-09-11）**：
+**Phase 2 G0→G3 已落地（2026-09-12）**：
 
 - pnpm monorepo（4 packages）
-- `packages/shared` 协议契约：15 单测全绿
-- `packages/server` Fastify HTTP：4 路由 + admin 边界 + 7 单测 + smoke 13/13 全过
-- `packages/client-mini` Cocos 兼容层 + headless 业务系统：5 单测覆盖核心循环
+- `packages/shared` 协议契约 v2（HTTP/WS/Auth/ErrorCode）：31 单测
+- `packages/server` Fastify HTTP + Colyseus WS 双入口、PostgreSQL 持久化、租约仲裁、跨进程故障矩阵：44 单测 + 34 集成 + smoke 13/13 + smoke:realtime 9/9
+- `packages/client-mini` 联网层（@colyseus/sdk + wx-compat）+ OnlineGameApp 运行时 + Cocos 工程：28 单测（含真实双进程 e2e）
 - `packages/client-app` RN API + GameStore + 类型契约：7 单测
-- 5 份架构文档（[docs/architecture.md](./docs/architecture.md) · [deployment.md](./docs/deployment.md) · [client-protocol.md](./docs/client-protocol.md) · [state-sync.md](./docs/state-sync.md) · [admin-integration.md](./docs/admin-integration.md)）
+- **微信开发者工具模拟器 E2E 已通过**：登录 → join → 种 → 30s → 收，DB 断言一致（见 [docs/cocos-runbook.md](./docs/cocos-runbook.md) §10）
+- 6 份架构文档（[docs/architecture.md](./docs/architecture.md) · [deployment.md](./docs/deployment.md) · [client-protocol.md](./docs/client-protocol.md) · [state-sync.md](./docs/state-sync.md) · [admin-integration.md](./docs/admin-integration.md) · [progress-phase2.md](./docs/progress-phase2.md)）
 
 **视觉规范未关闭**：[visual-repair-plan-v24.md](./docs/visual-repair-plan-v24.md) 仍按 v25 路线推进；本 PR 不动设计稿。
 
@@ -40,9 +41,66 @@ farm-game/
 ```bash
 pnpm install                       # 安装 workspace 依赖
 pnpm -r build                      # shared + server + client-mini + client-app 全部 tsc 通过
-pnpm -r test                       # shared 15 + server 7 + client-mini 5 + client-app 7 = 34/34 全绿
+pnpm -r test                       # shared 31 + server 44 + client-mini 28 + client-app 7 = 110/110 全绿
 pnpm smoke                         # 13/13 协议校验通过
 ```
+
+## 本地联调快速开始（G3）
+
+跑通 client-mini / curl / 微信开发者工具到本地后端的端到端联调。**前提**：本机有 Docker（db:up 起 PostgreSQL + Redis 用）。
+
+### 起后端（三个终端）
+
+```bash
+# 终端 1：起 PostgreSQL + Redis，并跑迁移
+pnpm --filter @farm-game/server db:up
+pnpm --filter @farm-game/server db:migrate
+
+# 终端 2：HTTP 入口
+pnpm --filter @farm-game/server dev          # http://127.0.0.1:3000
+
+# 终端 3：WS 入口（独立进程，共享同一 PostgreSQL）
+pnpm --filter @farm-game/server dev:ws       # ws://127.0.0.1:2567
+```
+
+### curl 跑通 mock 登录
+
+```bash
+curl -X POST http://127.0.0.1:3000/auth/wechat \
+  -H 'content-type: application/json' \
+  -d '{"code":"mock_dev_1"}'
+```
+
+返回示例（节选）：
+
+```json
+{
+  "ok": true,
+  "data": {
+    "token": "eyJhbGciOi...",
+    "player": { "playerId": "p_8c2a...", "revision": 1, ... },
+    "auth": { "playerId": "p_8c2a...", "issuedAt": 1762970000, "expiresAt": 1763574800 }
+  }
+}
+```
+
+- `token`：JWT，后续所有 `/player/*` `/farm/*` 请求在 `Authorization: Bearer <token>` 里带；
+- `player.playerId`：玩家唯一 id，client-mini 入参 / 日志关联用；
+- 重复用同一个 `code` 会复用同一玩家（`ensurePlayer` 幂等）。
+
+### client-mini 网络层 e2e
+
+```bash
+pnpm --filter @farm-game/client-mini test   # 需 db:up（依赖 server 真实端口）
+```
+
+### 微信开发者工具联调
+
+打开微信开发者工具 → 导入 `packages/client-mini` 的 Cocos 构建产物 → 右上角「详情 → 本地设置」：
+
+- 勾选 **「不校验合法域名」**（开发期直连本地）；
+- 项目设置里把请求域名改为 `http://127.0.0.1:3000`、WS 域名改为 `ws://127.0.0.1:2567`；
+- 真机预览时需把 PC 上的 3000/2567 端口通过工具自带的「内网穿透」或本机 `nginx -tcp` 转发给手机。
 
 ## 客户端矩阵
 

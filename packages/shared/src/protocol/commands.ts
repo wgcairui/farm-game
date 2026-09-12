@@ -28,11 +28,22 @@ export interface CommandRequest<TBody> {
  * version. On success, `player` carries the fresh save. On deterministic
  * failure, `player` reflects the unchanged save so the client doesn't have
  * to re-fetch to see the current world.
+ *
+ * T1 extension (G2 prep): `operationRevision` is the revision recorded on
+ * the persisted receipt when this outcome was originally settled. It
+ * equals `revision` for fresh executions and stays the older number for
+ * replays. `replayed` is `true` iff this call hit a persisted receipt
+ * instead of executing the command — clients can use the flag to skip
+ * re-rendering optimistic UI updates.
  */
 export interface CommandResponse<TPayload> {
   operationId: string;
   serverNow: number;
   revision: number;
+  /** Original settlement revision from the operation receipt, if any. */
+  operationRevision?: number | null;
+  /** True if the outcome came from a persisted receipt. */
+  replayed?: boolean;
   player: PlayerSave;
   payload?: TPayload;
 }

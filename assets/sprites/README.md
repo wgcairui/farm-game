@@ -1,8 +1,44 @@
-# 素材资源（Assets/Sprites · v2 参照物对齐版）
+# 素材资源（Assets/Sprites · v13 分层规范版）
 
-所有素材均为 SVG 矢量图，由 AI 生成手绘，Cocos Creator / Laya / Unity 2D 通用。
+素材以 PNG 位图为主（AI 生成 → 抠图），保留早期 SVG 矢量版作参照；Cocos Creator / Laya / Unity 2D 通用。
 
 > 配套预览：打开 `preview.html` 在浏览器中查看全部资源的实际渲染。
+> 图层模型与素材缺口计划：见 `docs/reference-video-analysis.md`（12 层 4 组 + 批次 A–H 生成计划）。
+
+## 当前版本状态（2026-09-12）
+
+| 版本目录 | 内容 | 状态 |
+| --- | --- | --- |
+| `scene/` `plots-v2/` `crops/` 等 SVG | v2 矢量初版，40+ 文件 | 保留作参照 |
+| `ai-art-v8/` `ai-art-v8-cutout/` | 第一代 AI 位图 + 抠图 | 历史版本 |
+| `ai-art-v10/` `ai-art-v12/` | 第二/三代 AI 位图（含 alt 候选与 _a 变体） | 历史版本，可挑优 |
+| `ai-art/` `ai-art-cutout/` | 按目录分类的成套位图 | 可用 |
+| `generated/batch-assets/`（项目根） | 2026-09-12 批量生成：地块 6 件套、5 作物四阶段 2×2 表、图标表、环境表（JPEG 带浅底） | 待切图抠图进 v13 |
+| `v13/`（本目录新增） | 按 12 层模型归档的定稿素材 | 生产中（批次 A–H） |
+
+## v13 目录结构（按图层归档）
+
+```
+sprites/
+├── v13/
+│   ├── plots/          # L8 地块 6 件套（locked/grass/tilled + 湿土/成熟/选中覆盖）
+│   ├── crops/          # L9 作物 5 种 × 4 阶段（stage1 播种 → stage4 成熟）
+│   ├── icons/          # L10/L11 图标（种子袋、水壶、金币、锁牌等）
+│   ├── scene-modules/  # L3–L7 场景拼装件（建筑/水域/道路/树/山/云）
+│   ├── effects/        # L10 特效帧序列（待批次 C）
+│   └── ui/             # L11/L12 UI 套件（待批次 H）
+└── …（旧版本目录原样保留）
+```
+
+## v13 命名规范
+
+```
+地块   plot_locked / plot_grass_empty / plot_tilled_empty / overlay_wet / overlay_ripe / overlay_selected
+作物   {carrot|potato|corn|tomato|strawberry}_stage{1..4}    # 1 播种 2 幼苗 3 生长 4 成熟
+特效   fx_{name}_{frame:00..}                                # 帧序列从 00 起
+UI     ui_{name}                                             # 底板加 _panel 后缀
+```
+
 
 ## 目录结构（v2）
 
@@ -154,4 +190,6 @@ plot_locked.svg    未解锁
 ## 版本历史
 
 - **v1**（v1.0）：基础 5 作物 + 3 地块 + 2 装饰 = 18 文件
-- **v2**（当前）：补全场景层 +建筑物 +动物 +工具 + UI + 品质色 = **40+ 文件**
+- **v2**：补全场景层 +建筑物 +动物 +工具 + UI + 品质色 = **40+ 文件**（SVG）
+- **ai-art v8 → v12**：三代 AI 位图与抠图迭代（PNG）
+- **v13**（当前）：按 12 层模型归档；来源为 batch-assets 切图抠图 + 批次 A–H 生成计划（`docs/reference-video-analysis.md`）

@@ -9,26 +9,24 @@
  *
  * Transient infrastructure errors (deadlock, network drop) NEVER persist a
  * receipt — the caller can safely retry those with the same operationId.
+ *
+ * Per T1 (G2 prep): the receipt's `(command, requestHash)` pair is checked
+ * together on every replay — using the same `operationId` for a different
+ * command or a different body is rejected with `OPERATION_ID_REUSED`. This
+ * closes the gap where `water(plot 0)` and `harvest(plot 0)` share the
+ * same body shape (`{plotIndex: 0}`) and would otherwise replay each other.
  */
 
 import { createHash } from 'node:crypto';
 import { EntityManager } from '@mikro-orm/core';
-import { canonicaliseBody, type CommandResponse } from '@farm-game/shared';
+import { canonicaliseBody, ErrorCode } from '@farm-game/shared';
 import { OperationReceipt } from '../../db/entities/OperationReceipt.js';
-import type { CommandOutcome } from './outcome.js';
+import { replayedFailure, replayedSuccess, type CommandOutcome } from './outcome.js';
 
 /** Stable SHA-256 hex digest of the canonicalised body (uppercase). */
 export function hashRequestBody(body: unknown): string {
   const value = body && typeof body === 'object' ? (body as Record<string, unknown>) : { value: body };
   return createHash('sha256').update(canonicaliseBody(value)).digest('hex');
-}
-
-export interface PersistedReceipt<TPayload> {
-  ok: boolean;
-  payload?: TPayload;
-  errorCode?: number;
-  message?: string;
-  revision: number;
 }
 
 interface PersistArgs<TPayload> {
@@ -70,41 +68,69 @@ export function persistReceipt<TPayload>(args: PersistArgs<TPayload>): CommandOu
 }
 
 /**
+ * Receipt lookup result — returns the outcome to replay plus a flag so the
+ * caller can mark the response as a replay (`replayed: true`).
+ *
+ * `null` means "no prior attempt"; a non-null value MUST be projected back
+ * through `projectReplay` so `execute.ts` can stamp the public
+ * `ExecuteResult.replayed` correctly.
+ */
+export interface ReceiptLookup<TPayload> {
+  outcome: CommandOutcome<TPayload>;
+  replayed: true;
+}
+
+/**
  * Read an existing receipt for `(playerId, operationId)`. Returns the
- * command outcome to replay, or null if no prior attempt exists.
+ * outcome to replay, or null if no prior attempt exists.
+ *
+ * The replayed success outcome's `revision` is the revision recorded at the
+ * original settlement (`revisionAfter`) — `execute.ts` surfaces it as
+ * `operationRevision` while the response's `revision` reflects the current
+ * snapshot.
  */
 export async function loadReceipt<TPayload>(
   em: EntityManager,
   playerId: string,
   operationId: string,
+  command: string,
   requestHash: string,
-): Promise<CommandOutcome<TPayload> | null> {
+): Promise<ReceiptLookup<TPayload> | null> {
   const row = await em.findOne(OperationReceipt, { playerId, operationId });
   if (!row) return null;
-  if (row.requestHash !== requestHash) {
+  if (row.command !== command || row.requestHash !== requestHash) {
     return {
-      ok: false,
-      code: 1000 as never, // BAD_REQUEST — typed loosely here; route layer maps to envelope.
-      message: 'operationId reused with different parameters',
+      replayed: true,
+      outcome: {
+        ok: false,
+        code: ErrorCode.OPERATION_ID_REUSED,
+        message: 'operationId reused with a different command or parameters',
+      },
     };
   }
   if (row.ok) {
-    return { ok: true, payload: row.responseData as TPayload, revision: row.revisionAfter ?? 0 };
+    return {
+      replayed: true,
+      outcome: {
+        ok: true,
+        payload: row.responseData as TPayload,
+        revision: row.revisionAfter ?? 0,
+      },
+    };
   }
   return {
-    ok: false,
-    code: (row.responseCode ?? 1000) as never,
-    message: (row.responseData as { message?: string } | null)?.message ?? 'replayed',
+    replayed: true,
+    outcome: {
+      ok: false,
+      code: (row.responseCode ?? ErrorCode.BAD_REQUEST) as never,
+      message: (row.responseData as { message?: string } | null)?.message ?? 'replayed',
+    },
   };
 }
 
-/** Compose the public response shape from an outcome + serverNow + player. */
-export function buildResponse<TPayload>(
-  operationId: string,
-  serverNow: number,
-  revision: number,
-  player: import('@farm-game/shared').PlayerSave,
-  payload: TPayload,
-): CommandResponse<TPayload> {
-  return { operationId, serverNow, revision, player, payload };
+/** Project a receipt lookup into the outcome the service should return. */
+export function projectReplay<TPayload>(lookup: ReceiptLookup<TPayload>): CommandOutcome<TPayload> {
+  return lookup.outcome.ok
+    ? replayedSuccess<TPayload>(lookup.outcome.payload, lookup.outcome.revision)
+    : replayedFailure<TPayload>(lookup.outcome.code, lookup.outcome.message);
 }

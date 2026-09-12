@@ -10,7 +10,7 @@ import { ErrorCode } from '@farm-game/shared';
 import { EntityManager, LockMode } from '@mikro-orm/core';
 import { Plot } from '../../db/entities/Plot.js';
 import { Player } from '../../db/entities/Player.js';
-import { hashRequestBody, loadReceipt, persistReceipt } from './receipts.js';
+import { hashRequestBody, loadReceipt, persistReceipt, projectReplay } from './receipts.js';
 import { failure, success, type CommandOutcome } from './outcome.js';
 import type { FarmUnlockPayload } from '@farm-game/shared';
 
@@ -29,8 +29,30 @@ export async function unlockCommand(args: UnlockArgs): Promise<CommandOutcome<Fa
   const { em, playerId, operationId, body, serverNow } = args;
   const requestHash = hashRequestBody(body);
 
-  const replayed = await loadReceipt<FarmUnlockPayload>(em, playerId, operationId, requestHash);
-  if (replayed) return replayed;
+  // Lock the player row so concurrent unlocks serialise (T1: single round-trip
+  // SELECT ... FOR UPDATE; the old `findOneOrFail + em.lock` could let two
+  // transactions read the same row before either held the lock).
+  const player = await em.findOne(
+    Player,
+    { playerId },
+    { lockMode: LockMode.PESSIMISTIC_WRITE },
+  );
+  if (!player) {
+    // No player row to serialise on. Check for a prior receipt (lock-free)
+    // so retrying a previously-settled operationId replays instead of
+    // colliding on the receipts unique constraint.
+    const prior = await loadReceipt<FarmUnlockPayload>(em, playerId, operationId, 'unlock', requestHash);
+    if (prior) return projectReplay(prior);
+    return persistReceipt<FarmUnlockPayload>({
+      em, playerId, operationId, command: 'unlock', requestHash, serverNow,
+      outcome: failure<FarmUnlockPayload>(ErrorCode.NOT_AUTHENTICATED, 'player row missing'),
+    });
+  }
+
+  const replayed = await loadReceipt<FarmUnlockPayload>(
+    em, playerId, operationId, 'unlock', requestHash,
+  );
+  if (replayed) return projectReplay(replayed);
 
   if (!Number.isInteger(body.plotIndex) || body.plotIndex < 0 || body.plotIndex > MAX_PLOT_INDEX) {
     return persistReceipt<FarmUnlockPayload>({
@@ -38,10 +60,6 @@ export async function unlockCommand(args: UnlockArgs): Promise<CommandOutcome<Fa
       outcome: failure<FarmUnlockPayload>(ErrorCode.PLOT_NOT_OWNED, 'plotIndex out of range'),
     });
   }
-
-  // Lock the player row so concurrent unlocks serialise.
-  const player = await em.findOneOrFail(Player, { playerId });
-  await em.lock(player, LockMode.PESSIMISTIC_WRITE);
 
   const plot = await em.findOne(Plot, { playerId, index: body.plotIndex });
   if (!plot) {

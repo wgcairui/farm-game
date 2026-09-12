@@ -6,16 +6,13 @@
  * truncated schema (TRUNCATE … RESTART IDENTITY CASCADE) so tests are
  * independent of order.
  *
- * Covered scenarios:
- *  - Complete farming loop (login → unlock → plant → water → harvest)
- *  - Repeated unlock is idempotent (no gold deducted on the second call)
- *  - Two harvest attempts on the same plot → only the first succeeds
- *  - Idempotent retry with the same operationId returns the same payload
- *    and does NOT deduct gold twice
- *  - Reusing an operationId with DIFFERENT params → ok:false (request hash
- *    mismatch)
- *  - Insufficient gold at plant time → PLOT_NOT_EMPTY/INSUFFICIENT_GOLD
- *    and no DB change
+ * T1 (G2 prep) additions:
+ *  - PG must be reachable. If `ping()` fails the suite exits non-zero via
+ *    `process.exitCode = 1` so a missing container cannot be mistaken for
+ *    a green run.
+ *  - New scenarios cover the receipt command/hash guard, the explicit
+ *    `operationRevision` + `replayed` fields, and the atomic identity
+ *    get-or-create under concurrent first-login pressure.
  *
  * Skipped automatically if MAIN_DB_URL is not reachable.
  */
@@ -29,10 +26,12 @@ import { buildMainDbOptions } from '../../src/db/mikro-orm.config.js';
 import { loadConfig } from '../../src/config.js';
 import { ApiClient, makeOperationId } from '@farm-game/client-app';
 import {
+  ErrorCode,
   type ApiResponse,
   type FarmHarvestResponse,
   type FarmPlantResponse,
   type FarmUnlockResponse,
+  type FarmWaterResponse,
   type LoginResponse,
   Platform,
 } from '@farm-game/shared';
@@ -72,8 +71,13 @@ async function truncateAll(): Promise<void> {
 before(async () => {
   reachable = await ping();
   if (!reachable) {
+    // T1: refuse to silently pass — print the missing URL and exit non-zero
+    // so the CI signal is unambiguous. `pnpm test:integration` is a separate
+    // script from `pnpm -r test` so unit tests in this package are not
+    // affected.
     // eslint-disable-next-line no-console
-    console.warn(`[integration] skipping — PostgreSQL not reachable at ${dbUrl}`);
+    console.error(`[integration] FAIL — PostgreSQL not reachable at ${dbUrl}. Start with \`pnpm db:up\`.`);
+    process.exitCode = 1;
     return;
   }
   process.env.NODE_ENV = 'test';
@@ -102,12 +106,13 @@ beforeEach(async () => {
   await truncateAll();
 });
 
-function skip(): boolean {
+function requireDb(): asserts reachable {
   if (!reachable) {
-    // t.skip keeps the assertion out of the report; assert.ok is a no-op fallback.
-    return true;
+    assert.fail(`PostgreSQL not reachable at ${dbUrl} — integration tests must run against a real DB`);
   }
-  return false;
+  if (!client) {
+    assert.fail('ApiClient not initialised — server failed to start');
+  }
 }
 
 async function login(code: string): Promise<LoginResponse> {
@@ -116,8 +121,8 @@ async function login(code: string): Promise<LoginResponse> {
   return (res as { ok: true; data: LoginResponse }).data;
 }
 
-test('G1: login → unlock → plant → water → harvest', async (t) => {
-  if (skip()) return;
+test('G1: login → unlock → plant → water → harvest', async () => {
+  requireDb();
   const code = `mock_int_${Date.now()}_${Math.random()}`;
   const loginData = await login(code);
   client!.setToken(loginData.token);
@@ -133,12 +138,12 @@ test('G1: login → unlock → plant → water → harvest', async (t) => {
   assert.equal(plant.ok, true);
   assert.equal((plant as { data: FarmPlantResponse }).data.player.gold, 90);
 
-  const water = (await client!.waterPlot(0)) as ApiResponse<import('@farm-game/shared').FarmWaterResponse>;
+  const water = (await client!.waterPlot(0)) as ApiResponse<FarmWaterResponse>;
   assert.equal(water.ok, true);
 
   // Force-ripen by reading the planted plot's matureAt, then time-travel via
   // setting plantedAt/matureAt back. Simpler: wait the remaining seconds.
-  const matureAt = (water as { data: import('@farm-game/shared').FarmWaterResponse }).data.payload.plot.matureAt;
+  const matureAt = (water as { data: FarmWaterResponse }).data.payload.plot.matureAt;
   const waitMs = Math.max(0, (matureAt ?? Date.now()) - Date.now()) + 500;
   await new Promise((r) => setTimeout(r, waitMs));
 
@@ -149,7 +154,7 @@ test('G1: login → unlock → plant → water → harvest', async (t) => {
 });
 
 test('G1: repeated unlock is idempotent and does not double-spend gold', async () => {
-  if (skip()) return;
+  requireDb();
   const data = await login(`mock_int_unlock_${Date.now()}`);
   client!.setToken(data.token);
   const first = (await client!.unlockPlot(6)) as ApiResponse<FarmUnlockResponse>;
@@ -165,7 +170,7 @@ test('G1: repeated unlock is idempotent and does not double-spend gold', async (
 });
 
 test('G1: idempotent retry with same operationId returns same payload', async () => {
-  if (skip()) return;
+  requireDb();
   const data = await login(`mock_int_idem_${Date.now()}`);
   client!.setToken(data.token);
   await client!.unlockPlot(6); // ensure plot[6] is unlocked
@@ -180,14 +185,24 @@ test('G1: idempotent retry with same operationId returns same payload', async ()
     'revision unchanged on idempotent replay',
   );
   assert.equal(
+    (second as { data: FarmPlantResponse }).data.operationRevision,
+    (first as { data: FarmPlantResponse }).data.operationRevision,
+    'operationRevision unchanged on idempotent replay',
+  );
+  assert.equal(
+    (second as { data: FarmPlantResponse }).data.replayed,
+    true,
+    'second response is flagged as a replay',
+  );
+  assert.equal(
     (second as { data: FarmPlantResponse }).data.player.gold,
     (first as { data: FarmPlantResponse }).data.player.gold,
     'gold unchanged on idempotent replay',
   );
 });
 
-test('G1: reuse operationId with different params returns ok:false', async () => {
-  if (skip()) return;
+test('G1: reuse operationId with different params returns OPERATION_ID_REUSED', async () => {
+  requireDb();
   const data = await login(`mock_int_dup_${Date.now()}`);
   client!.setToken(data.token);
   // Unlock plot 6 so we have a place to plant.
@@ -196,15 +211,35 @@ test('G1: reuse operationId with different params returns ok:false', async () =>
   const seed = (await client!.plantPlot(0, 'carrot', op)) as ApiResponse<FarmPlantResponse>;
   assert.equal(seed.ok, true);
   const mismatch = (await client!.plantPlot(1, 'carrot', op)) as ApiResponse<FarmPlantResponse>;
-  if (mismatch.ok) {
-    // eslint-disable-next-line no-console
-    console.error('debug mismatch response:', JSON.stringify(mismatch, null, 2));
-  }
   assert.equal(mismatch.ok, false, 'expected ok:false for operationId reuse with different params');
+  assert.equal(
+    (mismatch as { ok: false; code: number }).code,
+    ErrorCode.OPERATION_ID_REUSED,
+  );
+});
+
+test('G1: same operationId across commands rejects (water then harvest, both plot 0)', async () => {
+  requireDb();
+  const data = await login(`mock_int_xcmd_${Date.now()}`);
+  client!.setToken(data.token);
+  await client!.unlockPlot(6);
+  await client!.plantPlot(0, 'carrot');
+  const op = makeOperationId();
+  const water = (await client!.waterPlot(0, op)) as ApiResponse<FarmWaterResponse>;
+  assert.equal(water.ok, true);
+  // Wait until ripe so harvest would otherwise be valid.
+  const matureAt = (water as { data: FarmWaterResponse }).data.payload.plot.matureAt;
+  await new Promise((r) => setTimeout(r, Math.max(0, (matureAt ?? Date.now()) - Date.now()) + 500));
+  const harvest = (await client!.harvestPlot(0, op)) as ApiResponse<FarmHarvestResponse>;
+  assert.equal(harvest.ok, false, 'expected ok:false for operationId reuse across commands');
+  assert.equal(
+    (harvest as { ok: false; code: number }).code,
+    ErrorCode.OPERATION_ID_REUSED,
+  );
 });
 
 test('G1: concurrent harvests on the same plot award gold only once', async () => {
-  if (skip()) return;
+  requireDb();
   const data = await login(`mock_int_concurrent_${Date.now()}`);
   client!.setToken(data.token);
   await client!.unlockPlot(6);
@@ -229,11 +264,11 @@ test('G1: concurrent harvests on the same plot award gold only once', async () =
   assert.equal(successes.length, 1, 'exactly one harvest should succeed');
   assert.equal(failures.length, 1, 'the other harvest should fail');
   if (successes[0]) assert.equal(successes[0].payload.goldAwarded, 25);
-  if (failures[0]) assert.equal(failures[0].code, 3003 /* CROP_NOT_RIPE */);
+  if (failures[0]) assert.equal(failures[0].code, ErrorCode.CROP_NOT_RIPE);
 });
 
 test('G1: insufficient gold leaves the plot and gold unchanged', async () => {
-  if (skip()) return;
+  requireDb();
   const data = await login(`mock_int_poor_${Date.now()}`);
   client!.setToken(data.token);
   // Spend almost all gold so the next plant fails (plant carrot = 10g).
@@ -245,7 +280,58 @@ test('G1: insufficient gold leaves the plot and gold unchanged', async () => {
   const beforeGold = (before as { data: import('@farm-game/shared').PlayerSave }).data.gold;
   const fail = (await client!.plantPlot(0, 'carrot')) as ApiResponse<FarmPlantResponse>;
   assert.equal(fail.ok, false);
-  assert.equal((fail as { ok: false; code: number }).code, 3000 /* INSUFFICIENT_GOLD */);
+  assert.equal((fail as { ok: false; code: number }).code, ErrorCode.INSUFFICIENT_GOLD);
   const after = await client!.getPlayerInfo();
   assert.equal((after as { data: import('@farm-game/shared').PlayerSave }).data.gold, beforeGold);
+});
+
+test('G1: concurrent first-login with the same identity returns one player, no 500', async () => {
+  requireDb();
+  // Two parallel first-time logins for the same WeChat code must BOTH
+  // succeed with the same playerId. `ensurePlayer` catches the loser's
+  // IdentityAlreadyBoundError and re-reads the winner in a fresh
+  // transaction, so neither caller observes a 500 and exactly one player
+  // row exists for this identity (T1 review-fix).
+  const code = `mock_int_race_${Date.now()}_${Math.random()}`;
+  const [a, b] = await Promise.all([
+    client!.loginWeChat({ code }),
+    client!.loginWeChat({ code }),
+  ]);
+  assert.equal(a.ok, true, `first concurrent login failed: ${JSON.stringify(a)}`);
+  assert.equal(b.ok, true, `second concurrent login failed: ${JSON.stringify(b)}`);
+  const aData = (a as { ok: true; data: LoginResponse }).data;
+  const bData = (b as { ok: true; data: LoginResponse }).data;
+  assert.equal(aData.player.playerId, bData.player.playerId, 'both logins must converge on the same playerId');
+
+  const em = orm!.em.fork();
+  // The code already starts with `mock_`, so the auth route uses the code
+  // verbatim as the identity subject (the `mock_<first16>` fallback only
+  // applies to non-mock codes).
+  // MikroORM rewrites `?` placeholders to $n for postgres; passing raw `$1`
+  // leaves it unbound (42P02), so use the `?` form.
+  const rows = await em.getConnection().execute(
+    `SELECT COUNT(*)::int AS n FROM auth_identities WHERE provider = 'weChatMini' AND subject = ?`,
+    [code],
+  );
+  const count = Number((rows[0] as unknown as { n: number }).n);
+  assert.equal(count, 1, `exactly one identity row should exist, got ${count}`);
+});
+
+test('G1: planting over a ripe crop is rejected (PLOT_NOT_EMPTY)', async () => {
+  requireDb();
+  const data = await login(`mock_int_ripe_${Date.now()}`);
+  client!.setToken(data.token);
+  await client!.unlockPlot(6);
+  const plant = (await client!.plantPlot(0, 'carrot')) as ApiResponse<FarmPlantResponse>;
+  assert.equal(plant.ok, true);
+  const matureAt = (plant as { data: FarmPlantResponse }).data.payload.plot.matureAt;
+  await new Promise((r) => setTimeout(r, Math.max(0, (matureAt ?? Date.now()) - Date.now()) + 500));
+  // Plot is now ripe — replanting must fail instead of silently destroying
+  // the unharvested crop (T1 review-fix; was allowed before).
+  const replant = (await client!.plantPlot(0, 'carrot')) as ApiResponse<FarmPlantResponse>;
+  assert.equal(replant.ok, false, 'planting over a ripe crop must fail');
+  assert.equal(
+    (replant as { ok: false; code: number }).code,
+    ErrorCode.PLOT_NOT_EMPTY,
+  );
 });

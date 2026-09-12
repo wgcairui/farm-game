@@ -12,6 +12,7 @@
 
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import fastifyJwt from '@fastify/jwt';
+import fastifyCors from '@fastify/cors';
 import {
   ErrorCode,
   PROTOCOL_VERSION_MAJOR,
@@ -102,6 +103,29 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
       message: err.message || 'bad request',
       detail: validation ? { validation } : undefined,
     } satisfies ApiResponse<never>);
+  });
+
+  // 0a. CORS — browser / H5 clients only.
+  //
+  // WeChat mini-program `wx.request` does not consult CORS, so production
+  // gameplay traffic is unaffected. This gate exists for browser-side debug
+  // tooling (e.g. the eventual admin panel, local Swagger UI). Policy:
+  //   - CORS_ORIGIN set (comma-separated)  → exact allow-list
+  //   - CORS_ORIGIN unset & non-production → reflect any origin (dev convenience)
+  //   - CORS_ORIGIN unset & production     → origin: false (fail closed)
+  //
+  // Production MUST set CORS_ORIGIN explicitly; a silent "*" with Bearer
+  // tokens would be a footgun if a future web client is wired up. Methods
+  // are restricted to GET/POST and credentials are off (auth uses Bearer
+  // headers, not cookies — see ADR-0001 §3).
+  const corsOriginRaw = process.env.CORS_ORIGIN;
+  const corsOrigin = corsOriginRaw === undefined || corsOriginRaw === ''
+    ? (config.env === 'production' ? false : true)
+    : corsOriginRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  await app.register(fastifyCors, {
+    origin: corsOrigin,
+    methods: ['GET', 'POST'],
+    credentials: false,
   });
 
   // 1. Protocol version gate (preParsing). Runs before the body is parsed.

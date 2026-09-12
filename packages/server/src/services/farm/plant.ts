@@ -13,7 +13,7 @@ import { ErrorCode, computeMatureAt, getCrop, type FarmPlantPayload } from '@far
 import { LockMode } from '@mikro-orm/core';
 import { Plot } from '../../db/entities/Plot.js';
 import { Player } from '../../db/entities/Player.js';
-import { hashRequestBody, loadReceipt, persistReceipt } from './receipts.js';
+import { hashRequestBody, loadReceipt, persistReceipt, projectReplay } from './receipts.js';
 import { failure, success, type CommandOutcome } from './outcome.js';
 import { derivePlotStatus } from './plot-state.js';
 
@@ -29,8 +29,32 @@ export async function plantCommand(args: PlantArgs): Promise<CommandOutcome<Farm
   const { em, playerId, operationId, body, serverNow } = args;
   const requestHash = hashRequestBody(body);
 
-  const replayed = await loadReceipt<FarmPlantPayload>(em, playerId, operationId, requestHash);
-  if (replayed) return replayed;
+  // Lock the player row first so concurrent plant/water/harvest on the same
+  // player serialise. Using `lockMode: PESSIMISTIC_WRITE` on `findOne` issues
+  // `SELECT ... FOR UPDATE` in a single round-trip; the old two-step
+  // (findOne → em.lock) was racy because two transactions could read the
+  // same row before either held the lock.
+  const player = await em.findOne(
+    Player,
+    { playerId },
+    { lockMode: LockMode.PESSIMISTIC_WRITE },
+  );
+  if (!player) {
+    // No player row to serialise on. Check for a prior receipt (lock-free)
+    // so retrying a previously-settled operationId replays instead of
+    // colliding on the receipts unique constraint.
+    const prior = await loadReceipt<FarmPlantPayload>(em, playerId, operationId, 'plant', requestHash);
+    if (prior) return projectReplay(prior);
+    return persistReceipt({
+      em, playerId, operationId, command: 'plant', requestHash, serverNow,
+      outcome: failure<FarmPlantPayload>(ErrorCode.NOT_AUTHENTICATED, 'player row missing'),
+    });
+  }
+
+  const replayed = await loadReceipt<FarmPlantPayload>(
+    em, playerId, operationId, 'plant', requestHash,
+  );
+  if (replayed) return projectReplay(replayed);
 
   if (!Number.isInteger(body.plotIndex) || body.plotIndex < 0 || body.plotIndex > 23) {
     return persistReceipt({
@@ -46,9 +70,6 @@ export async function plantCommand(args: PlantArgs): Promise<CommandOutcome<Farm
     });
   }
 
-  const player = await em.findOneOrFail(Player, { playerId });
-  await em.lock(player, LockMode.PESSIMISTIC_WRITE);
-
   const plot = await em.findOne(Plot, { playerId, index: body.plotIndex });
   if (!plot) {
     return persistReceipt({
@@ -58,7 +79,11 @@ export async function plantCommand(args: PlantArgs): Promise<CommandOutcome<Farm
   }
 
   const liveStatus = derivePlotStatus(plot, serverNow);
-  if (!plot.unlocked || (liveStatus !== 'empty' && liveStatus !== 'ripe')) {
+  // Only `empty` plots accept a seed. Planting over a `ripe` crop used to be
+  // allowed here, which silently destroyed an unharvested crop — flagged in
+  // the T1 review and closed alongside the T1 review-fix (matches the G2
+  // plan: farm commands operate on `empty` plots only).
+  if (!plot.unlocked || liveStatus !== 'empty') {
     return persistReceipt({
       em, playerId, operationId, command: 'plant', requestHash, serverNow,
       outcome: failure<FarmPlantPayload>(ErrorCode.PLOT_NOT_EMPTY, 'plot is not empty'),

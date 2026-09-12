@@ -25,7 +25,8 @@ import { harvestCommand } from '../services/farm/harvest.js';
 import { plantCommand } from '../services/farm/plant.js';
 import { unlockCommand } from '../services/farm/unlock.js';
 import { waterCommand } from '../services/farm/water.js';
-import { executeCommand } from '../services/farm/execute.js';
+import { executeCommand, toCommandResponse } from '../services/farm/execute.js';
+import { logger } from '../obs/logger.js';
 
 interface FarmRoutesDeps {
   repo: PlayerRepo;
@@ -171,20 +172,34 @@ export async function farmRoutes(app: FastifyInstance, deps: FarmRoutesDeps): Pr
 
 function projectResponse<TPayload>(
   reply: import('fastify').FastifyReply,
-  result: { ok: boolean; code?: ErrorCode; message?: string; payload?: TPayload; revision: number; serverNow: number; player: import('@farm-game/shared').PlayerSave },
+  result: {
+    ok: boolean;
+    code?: ErrorCode;
+    message?: string;
+    payload?: TPayload;
+    revision: number;
+    operationRevision: number | null;
+    replayed: boolean;
+    serverNow: number;
+    player: import('@farm-game/shared').PlayerSave | null;
+  },
   meta: { operationId: string },
 ): ApiResponse<CommandResponse<TPayload>> {
   if (!result.ok) {
     reply.code(businessHttpStatus(result.code));
     return { ok: false, code: result.code ?? ErrorCode.BAD_REQUEST, message: result.message ?? 'command failed' };
   }
-  const data: CommandResponse<TPayload> = {
-    operationId: meta.operationId,
-    serverNow: result.serverNow,
-    revision: result.revision,
-    player: result.player,
-    ...(result.payload !== undefined ? { payload: result.payload } : {}),
-  };
+  // Shared with the WS room projection (services/farm/execute.ts) so the two
+  // transports cannot drift; throws only on an executeCommand invariant
+  // violation, which surfaces as an INTERNAL 500 below.
+  let data: CommandResponse<TPayload>;
+  try {
+    data = toCommandResponse(meta.operationId, result);
+  } catch (err) {
+    logger.error({ err }, 'command response projection failed');
+    reply.code(500);
+    return { ok: false, code: ErrorCode.INTERNAL, message: 'player state unavailable' };
+  }
   return { ok: true, data };
 }
 
@@ -195,6 +210,7 @@ function businessHttpStatus(code: ErrorCode | undefined): number {
     case ErrorCode.PLOT_NOT_EMPTY:
     case ErrorCode.CROP_NOT_RIPE:
     case ErrorCode.WATER_LIMIT_REACHED:
+    case ErrorCode.OPERATION_ID_REUSED:
       return 409;
     case ErrorCode.INSUFFICIENT_GOLD:
       return 402;

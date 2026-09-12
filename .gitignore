@@ -44,6 +44,11 @@ design-preview/*
 design-preview/_assets-*/
 design-preview/__pycache__/
 
+# generated/ 素材生成工作区 — 仅批次溯源 (asset-plan) 与已定稿产物入库, 被淘汰的候选轮次留在本地不入库
+generated/far-view-candidates/
+generated/qualified-candidates/
+generated/candidates/
+
 # AI 生成报告中的临时文件
 /tmp/
 
@@ -79,3 +84,5 @@ android/app/build/
 # Drizzle / MikroORM migrations cache（保留源文件，忽略运行产物）
 .mikro-orm-cache/
 .drizzle/
+# Node 诊断报告（--report-signal 产物）
+report.*.json

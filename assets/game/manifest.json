@@ -1,0 +1,449 @@
+{
+  "generatedBy": "scripts/slice-assets.py",
+  "bgDistanceThreshold": 40,
+  "sourceDir": "generated/batch-assets",
+  "entries": [
+    {
+      "source": "generated/batch-assets/plot_locked.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "locked",
+          "path": "plots/locked.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2829
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/plot_grass_empty.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "grass-empty",
+          "path": "plots/grass-empty.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2996
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/plot_tilled_empty.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "tilled-empty",
+          "path": "plots/tilled-empty.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2564
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/plot_wet_overlay.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "wet-overlay",
+          "path": "plots/wet-overlay.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2689
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/plot_ripe_overlay.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "ripe-overlay",
+          "path": "plots/ripe-overlay.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2614
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/plot_selection_overlay.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "selection-overlay",
+          "path": "plots/selection-overlay.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.3099
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/crop_radish_stages.jpeg",
+      "grid": [
+        2,
+        2
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "stage-1",
+          "path": "crops/carrot/stage-1.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.0866
+        },
+        {
+          "name": "stage-2",
+          "path": "crops/carrot/stage-2.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1537
+        },
+        {
+          "name": "stage-3",
+          "path": "crops/carrot/stage-3.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1113
+        },
+        {
+          "name": "stage-4",
+          "path": "crops/carrot/stage-4.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.0949
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/crop_potato_stages.jpeg",
+      "grid": [
+        2,
+        2
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "stage-1",
+          "path": "crops/potato/stage-1.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1925
+        },
+        {
+          "name": "stage-2",
+          "path": "crops/potato/stage-2.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2938
+        },
+        {
+          "name": "stage-3",
+          "path": "crops/potato/stage-3.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2223
+        },
+        {
+          "name": "stage-4",
+          "path": "crops/potato/stage-4.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2515
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/crop_corn_stages.jpeg",
+      "grid": [
+        2,
+        2
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "stage-1",
+          "path": "crops/corn/stage-1.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.0405
+        },
+        {
+          "name": "stage-2",
+          "path": "crops/corn/stage-2.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.0977
+        },
+        {
+          "name": "stage-3",
+          "path": "crops/corn/stage-3.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1155
+        },
+        {
+          "name": "stage-4",
+          "path": "crops/corn/stage-4.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1263
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/crop_tomato_stages.jpeg",
+      "grid": [
+        2,
+        2
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "stage-1",
+          "path": "crops/tomato/stage-1.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.0993
+        },
+        {
+          "name": "stage-2",
+          "path": "crops/tomato/stage-2.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1748
+        },
+        {
+          "name": "stage-3",
+          "path": "crops/tomato/stage-3.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1369
+        },
+        {
+          "name": "stage-4",
+          "path": "crops/tomato/stage-4.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2923
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/crop_strawberry_stages.jpeg",
+      "grid": [
+        2,
+        2
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "stage-1",
+          "path": "crops/strawberry/stage-1.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.152
+        },
+        {
+          "name": "stage-2",
+          "path": "crops/strawberry/stage-2.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2281
+        },
+        {
+          "name": "stage-3",
+          "path": "crops/strawberry/stage-3.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.2099
+        },
+        {
+          "name": "stage-4",
+          "path": "crops/strawberry/stage-4.png",
+          "width": 512,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.3011
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/icons_core_actions_economy.jpeg",
+      "grid": [
+        4,
+        2
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "seed-bag",
+          "path": "icons/seed-bag.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.9837
+        },
+        {
+          "name": "watering-can",
+          "path": "icons/watering-can.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.6681
+        },
+        {
+          "name": "droplet",
+          "path": "icons/droplet.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.9866
+        },
+        {
+          "name": "splash",
+          "path": "icons/splash.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1715
+        },
+        {
+          "name": "sparkle",
+          "path": "icons/sparkle.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.9798
+        },
+        {
+          "name": "coin",
+          "path": "icons/coin.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.9948
+        },
+        {
+          "name": "flying-coin",
+          "path": "icons/flying-coin.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.9542
+        },
+        {
+          "name": "lock",
+          "path": "icons/lock.png",
+          "width": 256,
+          "height": 512,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1562
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/environment_farm_modules.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "farm-modules",
+          "path": "env/farm-modules.png",
+          "width": 1024,
+          "height": 1024,
+          "bgRemoved": true,
+          "alphaCoverage": 0.1163
+        }
+      ]
+    },
+    {
+      "source": "generated/batch-assets/environment_tree_mountain_cloud.jpeg",
+      "grid": [
+        1,
+        1
+      ],
+      "bgRemoved": true,
+      "deviation": null,
+      "outputs": [
+        {
+          "name": "tree-mountain-cloud",
+          "path": "env/tree-mountain-cloud.png",
+          "width": 1248,
+          "height": 832,
+          "bgRemoved": true,
+          "alphaCoverage": 0.0
+        }
+      ]
+    }
+  ]
+}

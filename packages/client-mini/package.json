@@ -6,19 +6,28 @@
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
+    "./net": "./dist/net/index.js",
     "./runtime": "./dist/runtime/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --test --import tsx test/*.test.ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "build:cocos": "node scripts/build-cocos-bundle.mjs",
+    "gen:scene": "node scripts/gen-cocos-scene.mjs"
   },
   "dependencies": {
+    "@colyseus/sdk": "0.18.2",
     "@farm-game/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
+    "@types/node": "^20.14.10",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.2",
-    "@types/node": "^20.14.10"
-  }
+    "typescript": "^5.5.4"
+  },
+  "creator": {
+    "version": "3.8.8"
+  },
+  "uuid": "736d3f99-484d-4e6a-8369-6e8f9cbddc1a"
 }

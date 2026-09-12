@@ -20,7 +20,6 @@
 import { createDefaultPlayerSave } from '@farm-game/shared';
 import {
   EntityManager,
-  LockMode,
   UniqueConstraintViolationException,
 } from '@mikro-orm/core';
 
@@ -28,9 +27,11 @@ import { AuthIdentity } from '../db/entities/AuthIdentity.js';
 import { Plot } from '../db/entities/Plot.js';
 import { Player } from '../db/entities/Player.js';
 import {
+  generatePlayerId,
   IdentityAlreadyBoundError,
   type PlayerRepo,
 } from './player-repo.js';
+import { derivePlotStatus } from '../services/farm/plot-state.js';
 import type { TransactionRunner } from './transaction.js';
 
 const PG_UNIQUE_VIOLATION = '23505';
@@ -58,6 +59,99 @@ export class MikroORMPlayerRepo implements PlayerRepo {
       if (!row) return null;
       const save = await this.materialisePlayer(em, row.playerId);
       return save;
+    });
+  }
+
+  async getOrCreateByIdentity(
+    identity: Pick<import('@farm-game/shared').AuthIdentity, 'provider' | 'subject' | 'tenantId'>,
+    createSave: (playerId: string) => import('@farm-game/shared').PlayerSave,
+  ): Promise<import('@farm-game/shared').PlayerSave> {
+    return this.tx.run(async (em) => {
+      const tenantId = identity.tenantId ?? NO_TENANT;
+      const existing = await em.findOne(AuthIdentity, {
+        provider: identity.provider,
+        tenantId,
+        subject: identity.subject,
+      });
+      if (existing) {
+        const save = await this.materialisePlayer(em, existing.playerId);
+        if (!save) throw new Error('identity row references missing player');
+        return save;
+      }
+
+      // First-login path. Generate the player id *outside* the DB so two
+      // concurrent first logins with different ids can't collide; the
+      // auth_identities UNIQUE constraint is what makes this safe — at most
+      // one transaction's identity insert succeeds, the loser sees the
+      // row already there and reads it back.
+      const playerId = generatePlayerId();
+      const save = createSave(playerId);
+
+      // Insert the player row + 24 plot rows; flush the player first so the
+      // FK from `plots.player_id` resolves.
+      em.persist(
+        em.create(Player, {
+          playerId,
+          nickname: save.nickname ?? null,
+          avatarUrl: save.avatarUrl ?? null,
+          gold: save.gold,
+          gems: save.gems,
+          level: save.level,
+          exp: save.exp,
+          musicVolume: save.settings.musicVolume,
+          sfxVolume: save.settings.sfxVolume,
+          notificationsEnabled: save.settings.notificationsEnabled,
+          revision: save.revision,
+          createdAt: new Date(save.createdAt),
+          updatedAt: new Date(this.now()),
+        }),
+      );
+      await em.flush();
+      for (const plot of save.plots) {
+        em.persist(
+          em.create(Plot, {
+            id: plot.id,
+            playerId,
+            index: plot.index,
+            unlocked: plot.unlocked,
+            status: plot.status,
+            cropId: null,
+            plantedAt: null,
+            matureAt: null,
+            waterCount: plot.waterCount,
+          }),
+        );
+      }
+
+      // Try to bind the identity. If a concurrent caller raced past the
+      // `existing` check and committed first, the unique constraint fires
+      // here. PG has already aborted this transaction at that point, so
+      // "swallow and read back the winner" is impossible in-transaction;
+      // instead we throw and let `ensurePlayer` re-read the winner in a
+      // fresh transaction. The loser-side player + plots inserted above are
+      // rolled back with this transaction — the winner's rows stay canonical.
+      try {
+        em.persist(
+          em.create(AuthIdentity, {
+            playerId,
+            provider: identity.provider,
+            tenantId,
+            subject: identity.subject,
+            boundAt: new Date(this.now()),
+          }),
+        );
+        await em.flush();
+      } catch (err) {
+        if (!(err instanceof UniqueConstraintViolationException)) throw err;
+        throw new IdentityAlreadyBoundError(
+          identity.provider,
+          identity.subject,
+          '<raced>',
+        );
+      }
+
+      const out = await this.materialisePlayer(em, playerId);
+      return out!;
     });
   }
 
@@ -225,11 +319,17 @@ export class MikroORMPlayerRepo implements PlayerRepo {
       return createDefaultPlayerSave({ playerId });
     }
 
+    // Derive plot status from `matureAt` rather than reading the persisted
+    // `Plot.status` directly — `growing → ripe` is a time-driven transition
+    // (ADR-0003 D23) and must be visible after process restart. The DB only
+    // persists `growing / empty / locked`; `ripe` is always computed at
+    // projection time.
+    const nowMs = this.now();
     const projected: import('@farm-game/shared').PlotState[] = plots.map((row) => {
-      const status: import('@farm-game/shared').PlotStatus =
-        !row.unlocked
-          ? 'locked'
-          : (row.status as import('@farm-game/shared').PlotStatus);
+      const status = derivePlotStatus(
+        { unlocked: row.unlocked, status: row.status, matureAt: row.matureAt },
+        nowMs,
+      );
       const plot: import('@farm-game/shared').PlotState = {
         id: row.id,
         index: row.index,
@@ -264,16 +364,5 @@ export class MikroORMPlayerRepo implements PlayerRepo {
     if (player.nickname) save.nickname = player.nickname;
     if (player.avatarUrl) save.avatarUrl = player.avatarUrl;
     return save;
-  }
-
-  /** Convenience: lock the player row inside the current transaction. */
-  async lockPlayer(em: EntityManager, playerId: string): Promise<Player> {
-    // Lock via direct query: PESSIMISTIC_WRITE on a freshly-loaded row.
-    // `em.lock()` requires an entity instance (getReference returns a
-    // Reference<Player> wrapper for fresh ids), so we fetch first then
-    // lock — still within the same transaction.
-    const row = await em.findOneOrFail(Player, { playerId });
-    await em.lock(row, LockMode.PESSIMISTIC_WRITE);
-    return row;
   }
 }
