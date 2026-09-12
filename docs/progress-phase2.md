@@ -279,3 +279,23 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 - 四命令 handler：委托 `executeCommand` 并在命令事务内先 `assertCurrent`（fencing），提交后刷新快照广播。
 - `welcome/snapshot`：进房后从 DB 读全量投影发送；多连接广播；WS envelope 采用 shared `protocol/ws.ts` 的 G2 版本。
 - Redis 双进程行为、HTTP→WS 同步、重连恢复：T4。
+
+### 8.6 T2 review-fix（code review 高优先项收口）
+
+只读 code-review 对 T2 提出 1 Critical + 3 Important，全部落地：
+
+- **Critical：fencing 失效**——`assertCurrent` 的 `em.getConnection().execute(sql, params)` 不传事务上下文时经 knex 根连接 autocommit 执行，FOR UPDATE 行锁在语句结束即释放，fencing 完全不生效。修复：显式传 `em.getTransactionContext()` 并在无事务上下文时 fail closed（`LeaseLostError('no-transaction')`）。**用最小实验实证了修复有效**：事务内持锁期间，竞争 UPDATE 被阻塞 610ms 直到事务提交。配套新增锁竞争集成测试（红→绿判别）。
+- **Important：matchmaking 未按农场过滤**——`server.define('farm', FarmRoom)` 补 `.filterBy(['ownerId'])`，否则任何 farm 房间都会被 joinOrCreate 命中，lease 仲裁在 matchmaking 第一跳即被绕过（T3 一旦广播快照即跨农场泄漏）。
+- **Important：迁移 tracking 表建在锁外**——`ensureTrackingTable` 移入 advisory lock 回调内，HTTP/WS 并发首跑全新库不再有 DDL 竞态。
+- **Important：REDIS_URL production 必填误伤 HTTP 入口**——约束从 `loadConfig` 移到 WS 入口（HTTP 进程不使用 Redis）。
+- **次要清理**：WS 优雅停机不再重复关闭 Redis（Colyseus `gracefullyShutdown` 自带 driver/presence shutdown，二次关闭会产生 double-quit rejection）；`redis.close()` 收窄为启动失败清理路径专用；`FarmRoom.onCreate` 在 acquire 成功后的失败路径主动释放租约（Colyseus onCreate 抛错不调 onDispose）；`ownerId` 长度校验收紧至 36（与 players.player_id 列宽一致）。
+- **测试修正**：锁竞争测试修正计时窗口（阻塞发生在 expire UPDATE 上，原实现把计时包在 acquire 周围导致误报失败）并在 finally 中始终回收事务（断言失败时悬挂事务会以行锁污染下一测试的 TRUNCATE）；新增“同持有者过期 re-acquire 保持 epoch + 真实交接递增”场景；新增无事务上下文 fail-closed 断言。
+
+**验证矩阵（T2 review-fix 后，真实 PG）**：
+
+| 命令 | 范围 | 结果 |
+|---|---|---|
+| `pnpm -r build` | tsc | ✅ 全绿 |
+| `pnpm -r test` | 单测 | ✅ 66/66 |
+| `pnpm smoke` | InMemory HTTP smoke | ✅ 13/13 |
+| `pnpm --filter @farm-game/server test:integration` | 真实 PG（G1 9 项 + 租约 10 项） | ✅ **19/19** |

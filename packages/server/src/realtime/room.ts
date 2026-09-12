@@ -61,8 +61,11 @@ export class FarmRoom extends Room {
   override async onCreate(options: FarmRoomJoinOptions): Promise<void> {
     const ctx = requireContext();
     const { ownerId } = options;
-    if (typeof ownerId !== 'string' || ownerId.length === 0 || ownerId.length > 64) {
-      throw new Error('FarmRoom requires options.ownerId (T3 will verify it against the JWT subject)');
+    // 36 = the players.player_id column width (VARCHAR(36)); a JWT sub is a
+    // UUID, so anything longer is malformed. T3 verifies ownership against
+    // the token subject in onAuth.
+    if (typeof ownerId !== 'string' || ownerId.length === 0 || ownerId.length > 36) {
+      throw new Error('FarmRoom requires options.ownerId (≤36 chars; T3 will verify it against the JWT subject)');
     }
 
     // Room identity = farm identity. See module doc.
@@ -72,8 +75,9 @@ export class FarmRoom extends Room {
     // The client's join attempt fails with a matchmaking error and can
     // retry — `join` would then route to the existing room via the shared
     // driver directory.
+    let lease: RoomLease;
     try {
-      this.lease = await ctx.leases.acquire(ownerId, this.roomId, ctx.instanceId);
+      lease = await ctx.leases.acquire(ownerId, this.roomId, ctx.instanceId);
     } catch (err) {
       if (err instanceof LeaseConflictError) {
         logger.warn(
@@ -83,34 +87,46 @@ export class FarmRoom extends Room {
       }
       throw err;
     }
+    this.lease = lease;
 
-    logger.info(
-      { ownerId, roomId: this.roomId, instanceId: ctx.instanceId, epoch: this.lease.epoch },
-      'farm room lease acquired',
-    );
+    // Colyseus does NOT call onDispose when onCreate throws (verified against
+    // core 0.18.12 handleCreateRoom) — everything after the acquire must
+    // release the lease itself on failure, or it dangles until TTL expiry.
+    try {
+      logger.info(
+        { ownerId, roomId: this.roomId, instanceId: ctx.instanceId, epoch: this.lease.epoch },
+        'farm room lease acquired',
+      );
 
-    // Renew at config.leaseRenewMs. On loss (expired/taken over) the room
-    // MUST stop acting as an authority — disconnect everyone and dispose;
-    // the surviving instance rebuilds from PostgreSQL. (Full fault handling
-    // and drain semantics land in T4; the skeleton already refuses to serve
-    // after ownership loss.)
-    this.renewHandle = this.clock.setInterval(async () => {
-      if (!this.lease) return;
-      const renewed = await ctx.leases.renew(this.lease).catch((err) => {
-        logger.error({ err, ownerId: this.roomId }, 'farm room lease renew failed');
-        return null;
-      });
-      if (!renewed) {
-        logger.error({ ownerId: this.roomId, instanceId: ctx.instanceId }, 'farm room lease lost; disconnecting');
-        this.lease = null;
-        this.stopRenew();
-        await this.disconnect().catch((err) => {
-          logger.warn({ err, ownerId: this.roomId }, 'disconnect after lease loss failed');
+      // Renew at config.leaseRenewMs. On loss (expired/taken over) the room
+      // MUST stop acting as an authority — disconnect everyone and dispose;
+      // the surviving instance rebuilds from PostgreSQL. (Full fault handling
+      // and drain semantics land in T4; the skeleton already refuses to serve
+      // after ownership loss.)
+      this.renewHandle = this.clock.setInterval(async () => {
+        if (!this.lease) return;
+        const renewed = await ctx.leases.renew(this.lease).catch((err) => {
+          logger.error({ err, ownerId: this.roomId }, 'farm room lease renew failed');
+          return null;
         });
-        return;
-      }
-      this.lease = renewed;
-    }, ctx.config.leaseRenewMs);
+        if (!renewed) {
+          logger.error({ ownerId: this.roomId, instanceId: ctx.instanceId }, 'farm room lease lost; disconnecting');
+          this.lease = null;
+          this.stopRenew();
+          await this.disconnect().catch((err) => {
+            logger.warn({ err, ownerId: this.roomId }, 'disconnect after lease loss failed');
+          });
+          return;
+        }
+        this.lease = renewed;
+      }, ctx.config.leaseRenewMs);
+    } catch (err) {
+      this.stopRenew();
+      const leaseToRelease = this.lease;
+      this.lease = null;
+      await ctx.leases.release(leaseToRelease).catch(() => undefined);
+      throw err;
+    }
   }
 
   override onJoin(_client: Client): void {

@@ -50,15 +50,32 @@ export async function startWsServer(overrides?: {
     ...(redis ? { driver: redis.driver, presence: redis.presence } : {}),
   });
 
-  server.define('farm', FarmRoom);
+  // Per-farm rooms MUST be matched by ownerId — without the filter,
+  // joinOrCreate('farm', …) routes any farm's join into whichever farm room
+  // exists, bypassing lease arbitration entirely and leaking farm state
+  // across owners (T2 review #2; verified against core 0.18.12 matchmaking).
+  server.define('farm', FarmRoom).filterBy(['ownerId']);
 
   server.onShutdown(async () => {
     logger.info({ instanceId: boot.instanceId }, 'ws server shutting down');
-    if (redis) await redis.close();
+    // Colyseus' gracefullyShutdown already shuts the driver/presence down
+    // (Server.ts calls presence.shutdown() + driver.shutdown()); closing
+    // them again here produced double-quit rejections. Only DB resources
+    // are ours to release.
     await boot.close();
   });
 
-  await server.listen(config.wsPort, config.wsHost);
+  try {
+    await server.listen(config.wsPort, config.wsHost);
+  } catch (err) {
+    // Boot failure after resources were created — release them; the process
+    // entry then exits non-zero.
+    logger.fatal({ err }, 'ws listen failed');
+    if (redis) await redis.close();
+    await boot.close();
+    throw err;
+  }
+
   logger.info(
     {
       port: config.wsPort,

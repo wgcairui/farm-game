@@ -111,8 +111,11 @@ export async function applyPendingMigrations(dbUrl: string): Promise<ApplyResult
   const client = new Client({ connectionString: dbUrl });
   await client.connect();
   try {
-    await ensureTrackingTable(client);
+    // Tracking-table creation is INSIDE the lock (T2 review #3): concurrent
+    // CREATE TABLE IF NOT EXISTS can still collide on pg catalog indexes,
+    // and the HTTP + WS entries boot against a fresh database together.
     return await withMigrationLock(client, async () => {
+      await ensureTrackingTable(client);
       const migrations = loadMigrations();
       const done = await appliedMigrations(client);
       const applied: string[] = [];
@@ -137,8 +140,8 @@ export async function rollbackLastMigration(dbUrl: string): Promise<string | nul
   const client = new Client({ connectionString: dbUrl });
   await client.connect();
   try {
-    await ensureTrackingTable(client);
     return await withMigrationLock(client, async () => {
+      await ensureTrackingTable(client);
       const done = await appliedMigrations(client);
       const migrations = loadMigrations();
       for (let i = migrations.length - 1; i >= 0; i -= 1) {

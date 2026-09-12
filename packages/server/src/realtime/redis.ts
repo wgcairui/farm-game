@@ -22,7 +22,12 @@ import { logger } from '../obs/logger.js';
 export interface RedisInfra {
   driver: RedisDriver;
   presence: RedisPresence;
-  /** Best-effort close of both clients. Idempotent. */
+  /**
+   * Best-effort close of both clients. Reserved for BOOT-FAILURE cleanup —
+   * on the graceful shutdown path Colyseus' `gracefullyShutdown` already
+   * calls `presence.shutdown()` + `driver.shutdown()` itself, and calling
+   * them a second time here produced double-quit rejections (T2 review).
+   */
   close(): Promise<void>;
 }
 
@@ -42,6 +47,10 @@ export async function createRedisInfra(redisUrl: string): Promise<RedisInfra> {
     close: async () => {
       if (closed) return;
       closed = true;
+      // Both are best-effort: `presence.shutdown()` returns void and may
+      // fire internal quit() rejections we cannot attach handlers to, so
+      // this path must only run when the graceful shutdown did NOT already
+      // close the clients (i.e. boot failures).
       try {
         await driver.shutdown();
       } catch (err) {

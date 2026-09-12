@@ -50,7 +50,7 @@ export class LeaseConflictError extends Error {
   }
 }
 
-export type LeaseLostReason = 'missing' | 'expired' | 'room-mismatch' | 'instance-mismatch' | 'epoch-mismatch';
+export type LeaseLostReason = 'no-transaction' | 'missing' | 'expired' | 'room-mismatch' | 'instance-mismatch' | 'epoch-mismatch';
 
 export class LeaseLostError extends Error {
   constructor(
@@ -221,17 +221,28 @@ export class RoomLeaseRepo {
    *
    * The row lock is held until the command transaction commits, closing the
    * "checked once, wrote later" window a lock-free check would leave.
+   *
+   * MikroORM pitfall (T2 review Critical #1): `em.getConnection().execute()`
+   * only reuses the transaction's connection when the transaction context is
+   * passed explicitly — without it the statement runs on a separate pool
+   * connection in autocommit and the FOR UPDATE lock evaporates at
+   * statement end, silently disabling fencing. We therefore read the
+   * context from the EM and fail closed when there is none.
    */
   async assertCurrent(em: EntityManager, lease: RoomLease): Promise<void> {
-    // `em.getConnection()` returns the transactional connection inside an
-    // open transaction, so the FOR UPDATE lock participates in the command's
-    // own transaction.
+    const txContext = em.getTransactionContext();
+    if (!txContext) {
+      // Fail closed: a lock-free lease check would be security theatre.
+      throw new LeaseLostError(lease.ownerId, 'no-transaction');
+    }
     const rows = (await em.getConnection().execute<LeaseRow[]>(
       `SELECT room_id, instance_id, epoch, expires_at
        FROM farm_room_leases
        WHERE owner_id = ? AND expires_at > now()
        FOR UPDATE`,
       [lease.ownerId],
+      'all',
+      txContext,
     )) as LeaseRow[];
     if (!rows || rows.length === 0) {
       throw new LeaseLostError(lease.ownerId, 'expired');

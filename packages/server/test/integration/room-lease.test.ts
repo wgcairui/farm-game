@@ -103,7 +103,7 @@ async function seedPlayer(): Promise<string> {
 /** Force-expire every lease row using the DB clock. */
 async function expireAllLeases(): Promise<void> {
   const em = orm!.em.fork();
-  await em.execute(`UPDATE farm_room_leases SET expires_at = now() - interval '1 second'`);
+  await em.getConnection().execute(`UPDATE farm_room_leases SET expires_at = now() - interval '1 second'`);
 }
 
 test('lease: fresh acquire creates the row with epoch 1', async () => {
@@ -200,9 +200,20 @@ test('lease: assertCurrent locks and verifies inside a command transaction', asy
     await leasesA!.assertCurrent(tem, lease);
   });
 
-  // After another instance takes over, the stale handle fails with
-  // epoch-mismatch (room and instance both differ; epoch is the decisive
-  // fence). The exact reason depends on which mismatch is detected first.
+  // Fail closed: without a transaction context there is no lock to hold —
+  // the check must refuse rather than run in autocommit (T2 review #1).
+  const bareEm = orm!.em.fork();
+  await assert.rejects(
+    () => leasesA!.assertCurrent(bareEm, lease),
+    (err: unknown) => {
+      assert.ok(err instanceof LeaseLostError);
+      assert.equal((err as LeaseLostError).reason, 'no-transaction');
+      return true;
+    },
+  );
+
+  // After another instance takes over, the stale handle fails with a
+  // mismatch reason (room/instance/epoch — epoch is the decisive fence).
   await expireAllLeases();
   await leasesB!.acquire(ownerId, ownerId, 'instance-B');
 
@@ -219,4 +230,69 @@ test('lease: assertCurrent locks and verifies inside a command transaction', asy
       return true;
     },
   );
+});
+
+test('lease: FOR UPDATE row lock blocks competing writers until the command transaction commits', async () => {
+  // The discriminating test for T2 review Critical #1. When assertCurrent
+  // runs inside the transaction, the lease row lock is held until commit
+  // and any competing writer waits; the old autocommit behaviour released
+  // the lock at statement end, so writers returned immediately and this
+  // test went red against the broken implementation. NOTE: the blocked
+  // writer is the expire UPDATE itself — the takeover only runs after it,
+  // so the timing window MUST include the expire.
+  requireDb();
+  const ownerId = await seedPlayer();
+  const lease = await leasesA!.acquire(ownerId, ownerId, 'instance-A');
+
+  const em = orm!.em.fork();
+  let txCommitted = false;
+  const tx = em.transactional(async (tem) => {
+    await leasesA!.assertCurrent(tem, lease);
+    // Hold the row lock long enough for the competing writer to queue.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    txCommitted = true;
+  });
+
+  try {
+    // Let the transaction acquire the lock first.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Competing writer: the expire UPDATE must queue behind the open
+    // transaction and only proceed once it commits. Under autocommit
+    // fencing it returns in a few milliseconds.
+    const start = Date.now();
+    await expireAllLeases();
+    const takeover = await leasesB!.acquire(ownerId, ownerId, 'instance-B');
+    const elapsed = Date.now() - start;
+
+    await tx;
+    assert.ok(txCommitted, 'command transaction committed');
+    assert.ok(
+      elapsed >= 300,
+      `competing writer should block until commit, returned in ${elapsed}ms`,
+    );
+    assert.equal(takeover.epoch, '2');
+  } finally {
+    // Never leave a dangling transaction behind to poison the next test
+    // (a failed assertion before `await tx` would otherwise leak an open
+    // transaction holding row locks into beforeEach's TRUNCATE).
+    await tx.catch(() => undefined);
+  }
+});
+
+test('lease: same holder re-acquiring its own expired lease keeps the epoch', async () => {
+  // Fencing invariant pairing: epoch only increments when ownership CHANGES
+  // hands. The same instance re-acquiring after expiry is not a handover —
+  // its (room, instance, epoch) fencing triple stays coherent.
+  requireDb();
+  const ownerId = await seedPlayer();
+  const first = await leasesA!.acquire(ownerId, ownerId, 'instance-A');
+  await expireAllLeases();
+  const again = await leasesA!.acquire(ownerId, ownerId, 'instance-A');
+  assert.equal(again.epoch, first.epoch, 'same holder re-acquire does not bump epoch');
+  // A different instance can only take over once the holder gives the lease
+  // up — and a real handover increments the epoch.
+  await leasesA!.release(again);
+  const other = await leasesB!.acquire(ownerId, ownerId, 'instance-B');
+  assert.equal(other.epoch, '2', 'real handover increments epoch');
 });

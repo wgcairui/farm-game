@@ -19,8 +19,9 @@ export interface ServerConfig {
 
   /**
    * Redis connection for the Colyseus matchmaker directory + presence across
-   * WS processes. Null → single-process LocalDriver (development only;
-   * production MUST set REDIS_URL — the WS entry refuses to boot without it).
+   * WS processes. Null → single-process LocalDriver (development only).
+   * Enforcement note: only the WS entry requires this in production — the
+   * HTTP process never touches Redis.
    */
   redisUrl: string | null;
 
@@ -146,12 +147,9 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     console.warn(`[config] HOST=0.0.0.0 exposes the server on all interfaces; restrict via HOST in production`);
   }
 
-  // Production: the WS entry must share farm state across processes via
-  // Redis — a LocalDriver deployment silently breaks matchmaking between
-  // replicas (G2 plan: "Redis 启动不可达 → readiness 不通过，不回退").
-  if (env === 'production' && !redisUrl) {
-    throw new ConfigError('REDIS_URL must be set explicitly in production (multi-process WS matchmaking).');
-  }
+  // Note (T2 review #4): REDIS_URL production enforcement lives in the WS
+  // entry (realtime/serve.ts), not here — the HTTP process never touches
+  // Redis and must not be blocked by a WS-only constraint.
 
   return {
     port,
