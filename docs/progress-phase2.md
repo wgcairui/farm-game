@@ -3,7 +3,7 @@
 > 日期：2026-09-11 · 分支 `feat/phase2-g0-contract`
 > 起点：Phase 1 单机骨架 (`b0becb1`)
 > 范围：契约 / 安全 / 玩法统一 / 持久化与原子命令
-> 状态：**G0 / G0.5 / G1 已落地；G2 / G3 / G4 未开始**
+> 状态：**G0 / G0.5 / G1 / G2 / G3 已落地；G4（真机回归 + 发布收口）/ G1.5（真实微信登录）未完成**
 
 ## 1. 提交栈
 
@@ -99,9 +99,10 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 
 | 关卡 | 范围 | 阻塞 |
 |---|---|---|
-| **G2** | Colyseus WS 房间 + 断线重连 + 幂等收据复用 G1 + 两进程竞争测试 | 无外部阻塞；G1 命令服务已 HTTP+WS 共用 |
-| **G3** | Cocos Creator 3.8.x 工程 + 微信开发者工具 + 真实联调 | **Cocos 编辑器 + 微信 AppID 必须就位** |
-| **G4** | 部署文档 + `architecture.md` §9 阶段路线 + `DELIVERY.md` 追加 | 无外部阻塞 |
+| ~~G2~~ | ~~Colyseus WS 房间 + 断线重连 + 幂等收据复用 G1 + 两进程竞争测试~~ | ✅ 已完成（§6–11，commit fb49188→967ad12） |
+| ~~G3~~ | ~~Cocos Creator 3.8.x 工程 + 微信开发者工具 + 真实联调~~ | ✅ 已完成（§12，commit `9ef7c24`；模拟器 E2E 通过） |
+| **G4** | wx transport 真机回归 + 包体/图集优化 + 上线发布链路 | 真机 + 微信 AppID 就位 |
+| **G1.5** | 真实微信 jscode2session（AppID/AppSecret）+ Apple/Google id_token | 凭据就位 |
 
 详见项目记忆 [[../.zcode/cli/memories/projects/farm-game-848868ab67a8f96a/memory/development-roadmap.md]] 与 [[../.zcode/cli/memories/projects/farm-game-848868ab67a8f96a/memory/monorepo-architecture.md]]。
 
@@ -134,7 +135,7 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 ### 6.4 T0 未验证、留给后续阶段的事
 
 - Colyseus matchmake HTTP 响应结构、JOIN_ROOM 字节序列、ROOM_DATA 解码。
-- 客户端 SDK 选型：0.18 没有官方 SDK，最终客户端必须自己实现 WS 握手与 envelope 解码。该选型属于 G3 客户端接入而非 T0 server spike。
+- 客户端 SDK 选型：0.18 没有官方 SDK，最终客户端必须自己实现 WS 握手与 envelope 解码。该选型属于 G3 客户端接入而非 T0 server spike。（**已被 §12 推翻**：G3 实际采用 `@colyseus/sdk 0.18.2` + wx-compat，实测可用）
 - Redis / 多进程 / 跨节点：T2 才引入。
 
 ### 6.5 后续阶段提交前需复核
@@ -311,9 +312,9 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 - **D32** envelope 复用 `PROTOCOL_VERSION '2.0.0'`，服务器校验 major；结构垃圾 ephemeral 不落 receipt（镜像 HTTP 400），业务失败仍落 receipt。
 - **D33** `onAuth` 用 `fast-jwt`（`@fastify/jwt` 同底座）以同 secret/iss/aud 验签；`options.ownerId === token.sub` 强一致，跨农场拒绝；verified playerId 走 `client.auth`。
 - **D34** fencing 注入 `executeCommand` 的 `run` 回调：`assertCurrent(em, lease)` 与命令写同事务同连接；`LeaseLostError` → 整事务回滚（命令与收据都不落库）→ 房间断开 → 原 `operationId` 可安全重试。新错误码 `LEASE_LOST: 4300`。
-- **D35** 快照以 `farm_refresh`（拉取）为可靠路径。实测 core 0.18.12 `_onJoin` 先 `await onJoin()` 再发 `JOIN_ROOM`，SDK 客户端必然丢弃 join 推送——推送保留给 G3 自研客户端（缓冲 pre-join 帧）。
+- **D35** 快照以 `farm_refresh`（拉取）为可靠路径。实测 core 0.18.12 `_onJoin` 先 `await onJoin()` 再发 `JOIN_ROOM`，SDK 客户端必然丢弃 join 推送——G3 客户端因此以 `farm_refresh` 拉取快照（见 §12）。
 - **D36** 成功命令：请求者 `cmd_result`（r 回声 + `toCommandResponse` 共享投影）+ 全连接 `plot_updated`/`gold_updated`；失败仅回请求者 `error`（带 r），不广播。
-- **D37** 测试栈 `@colyseus/testing@0.18.5` + `@colyseus/sdk@0.18.2`（T1"SDK 只到 0.16"结论仅适用旧包名 `colyseus.js`；生产客户端走 wx.connectSocket 的 G3 结论不变）。`serve.ts` 抽 `buildWsServer(config)` 供测试构造。
+- **D37** 测试栈 `@colyseus/testing@0.18.5` + `@colyseus/sdk@0.18.2`（T1"SDK 只到 0.16"结论仅适用旧包名 `colyseus.js`；~~生产客户端走 wx.connectSocket 自研~~ **已被 §12 推翻：生产小游戏采用 SDK + wx-compat**）。`serve.ts` 抽 `buildWsServer(config)` 供测试构造。
 
 ### 9.2 新增与改动
 
@@ -437,3 +438,71 @@ pnpm --filter @farm-game/server test:integration  # 真实 PG 集成
 - Review 同时明确验证了 fencing（无事务上下文 fail-closed + 事务内 FOR UPDATE + epoch 四重校验）、关停顺序（Colyseus 先 dispose 房间再跑 onShutdown，租约释放发生在连接池关闭前）、watcher 乱序防护、解析健壮性与无 token 落日志——均无问题。
 
 **验证矩阵（review-fix 后）**：build ✅ / 单测 87/87 / smoke 13/13 / smoke:realtime 9/9 / 集成 **34/34**（farm-room 的 createRoom 助手补齐建房 token 以匹配新的 creation gate）。
+
+---
+
+## 12. G3 落地（client-mini 联网层 + Cocos 工程 + 模拟器 E2E，2026-09-12）
+
+> commit `9ef7c24`（分支 `feat/phase2-t0-realtime-spike`，本地未 push）。由 subagent team 并行交付（前段）+ 微信开发者工具模拟器联调收口（后段）两个 session 完成。
+
+### 交付物
+
+- **`client-mini/src/net/`**：`HttpTransport` 注入缝（fetch / wx.request 双实现）→ `FarmHttpClient`（信封解包 + Bearer token + `serverNowOffsetMs` 时钟偏移）→ `FarmRealtimeClient`（`@colyseus/sdk 0.18.2` 的 `joinOrCreate('farm')` + `farm_refresh` 拉取 welcome + `farm_cmd` 按 `r=operationId` 匹配 `cmd_result`/`error` + plot/gold 广播回调）。关键契约：SDK 的 `onMessage` 送达完整 WsEnvelope `{v,t,r,p,ts}`，dispatch 入口统一解包一次。
+- **`client-mini/src/net/wx-compat.ts`**（模拟器联调补丁，必须在 `@colyseus/sdk` import 之前求值）：① `WebSocket.prototype.send` 把 msgpack Uint8Array 视图拷贝为精确长度 ArrayBuffer（`wx.sendSocketMessage` 只收 `string|ArrayBuffer`；官方文档要求的 patch）；② `wx.connectSocket` 守卫——SDK 0.18 首选 `new WebSocket(url, {headers})`（Node 形），Cocos web-adapter 会把该 options 对象当 subprotocol 传下去导致连接永不建立，守卫同步 throw 逼 SDK 落回 browser 形（[colyseus.js#161](https://github.com/colyseus/colyseus.js/issues/161)）。
+- **`client-mini/src/cocos-entry.ts`**：小游戏 fetch/Headers/Response/URL shims（全部 Map/Set `.forEach` 实现，**禁用迭代器协议**——DevTools「增强编译」会把 `[...map.entries()]` 等转译成含 undefined 洞的数组，曾以 `Cannot read properties of undefined (reading 'join')` 的形式炸掉 matchmake）+ fetch shim 同步异常堆栈诊断。
+- **`client-mini/src/runtime/online.ts` OnlineGameApp**：服务端权威（本地仅存最近 PlayerSave + 时钟偏移）、乐观 patch + cmd_result 覆盖 + 失败快照回滚、revision 守卫（ADR-0003 D18）、1s/2s/4s×5 退避重连、事件名与 HeadlessGameApp 对齐（UI 唯一对接缝）。
+- **Cocos 工程**：`assets/scripts/OnlineFarm.ts`（程序化 6×4 地块 UI，EventBus 驱动）+ `assets/scripts/vendor/farm-online.js`（esbuild bundle，`pnpm build:cocos`）+ 场景/资源；资产管线 `scripts/slice-assets.py` → `assets/game/`。
+- **server**：`@fastify/cors`（CORS_ORIGIN；非生产默认 origin:true，生产 fail-closed false），服务 H5/浏览器调试。
+- **shared**：EventBus.emit 改 Set.forEach 快照分发（同迭代器协议问题，勿回退）。
+- **文档**：`docs/cocos-runbook.md`（从零到模拟器手册 + §10 联调坑与标准构建链）、deployment.md 单机运行手册、README 快速开始。
+
+### 模拟器 E2E 验收（2026-09-12）
+
+微信开发者工具模拟器（iPhone 12/13，基础库 3.17.2，Cocos Creator 3.8.8 CLI 构建）完整闭环：**登录 → joinOrCreate(farm) → farm_refresh welcome → 种胡萝卜（−10 金）→ 30s 成熟 → 收获（+25 金）**。`players.gold/revision` 与 `plots.status` 在每步经 psql 断言一致；多次重编译后同玩家状态保留（固定 mock code `mock_dev_cocos_simulator`）。console 基线：`[wx-compat] installed guard=true send=true` + `[OnlineFarm] 已连接服务端`，无业务红字。
+
+### 验证矩阵（G3 完成态）
+
+```bash
+pnpm -r build    # ✅ 4 包全绿
+pnpm -r test     # ✅ 单测 110/110（shared 31 + server 44 + mini 28 + app 7）
+# mini 28 含 net shim 行为测试 + e2e-online.test.ts（真实双子进程 HTTP+WS，PG/Redis 不可达自动 skip）
+```
+
+### 剩余（通往 MVP）
+
+wx transport **真机**回归（模拟器已验证的 wx-compat 需在真机网络栈复测）→ 发布链路收口（图集/包体、上线流程）→ G1.5 真实微信 jscode2session（需 AppID/AppSecret，接入点 `auth/routes.ts` mock 分支）。
+
+---
+
+## 13. v13 美术管线落地（大地图底图 + 分层素材 + 生成计划）——补记
+
+> 交付于 2026-09-12，commits `0da3c8b`（素材与文档）+ `e46131f`（候选目录 gitignore 策略）。规范与缺口总计划见 [reference-video-analysis.md](./reference-video-analysis.md)，目录与命名规范见 [assets/sprites/README.md](../assets/sprites/README.md)。
+
+### 13.1 关键产出
+
+- **参考视频机制分析**（`docs/reference-video-analysis.md`）：竞品录屏逐段拆解 + 与 Phase 2 机制对照表 + **12 层 4 组图层模型**（屏幕组 / 对象组 / 地图组 / 视差带）+ 商店购买弹窗信息密度范式。确立"底图大于屏幕 + 镜头漫游 + UI 固定屏幕层"的大地图方向——这是此前多轮"扩图"尝试失败的根因澄清。
+- **大地图底图定稿**：`assets/sprites/v13/map/farm-map-base-2x.jpeg`（1440×2560，4 候选中选 3）+ `plot-layout.json`（留空区 (100,645)–(600,1165)，24 格 = 6 列 × 4 行，每格 70.7×90 @720 设计坐标，×2 对齐资产，含每格 rect 与中心点）。
+- **v13 分层素材 52 件**：plots 6（locked/grass/tilled + 湿土/成熟/选中覆盖）、crops 5 作物 × 4 阶段、icons 9、scene-modules 10、effects 5、map 2。
+
+### 13.2 管线方法（沉淀给批次 D–H 复用）
+
+- MiniMax `image-01` REST 直调（`subject_reference` 仅支持 `character`，无 outpaint/mask 能力——严格外扩不可行，改用"生成留白底图 + 引擎叠地块"方案）；批量请求 + 失败重试 ≤5 + 逐张落盘验证 + 评审联系表。
+- JPEG 浅底 → 透明 PNG 抠图脚本（角点采样背景色 + 差分 alpha）。
+- **非网格排布的生成表用连通域检测提取**：4×2 图标/环境表模型不服从网格，按格切会错位；2×2 作物表可按格切。
+- 白色主体（白萝卜、星星中心）会被浅底误抠：提示词加"深色描边"+ 改中灰背景，二轮重生成解决。
+
+### 13.3 批次状态
+
+| 批次 | 内容 | 状态 |
+|---|---|---|
+| A | 大地图底图候选 + 定稿 + 24 格坐标 | ✅ |
+| P | batch-assets 切图抠图归档 v13（45 件） | ✅ |
+| B | 作物修复（carrot/corn/potato，两轮） | ✅ |
+| C | 特效 5 组单帧（2 张二轮修复） | ✅ |
+| D | 远山第二层 + 宽幅视差长条 | 待做 |
+| E | 树林带/灌木/云补充 | 待做 |
+| F | 水域（波光 2 帧/荷叶/小桥） | 待做 |
+| G | 道路/栅栏拼块 + 水井 | 待做 |
+| H | UI 套件（HUD/功能列/弹窗底板） | 待做 |
+
+被淘汰候选轮次（`generated/{candidates,qualified-candidates,far-view-candidates}/`）本地保留、git 排除（`e46131f`）。

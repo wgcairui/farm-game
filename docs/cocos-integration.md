@@ -152,6 +152,21 @@ Canvas
 - **UIButton**：可见 Sprite/Label 与独立命中节点，具备正常、按下、禁用和焦点等所需状态。
 - **业务**：先核对现有 TypeScript 接口，再逐步接入存档、计时、种植、收获、仓库、商店及 HUD；验证事件解绑、异常路径和重载恢复。
 
+### 6.1 素材来源映射（v13，2026-09-12）
+
+`assets/sprites/v13/` 已提供本节结构的直接对接物（缺口计划与批次状态见 [reference-video-analysis.md](./reference-video-analysis.md)）：
+
+| 场景节点 | v13 素材 | 说明 |
+|---|---|---|
+| WorldRoot 整体 | `map/farm-map-base-2x.jpeg` | 1440×2560 可漫游底图（天空/远山/水系/道路/装饰已合成单图）；如需视差再按批次 D/E 拆分 |
+| PlotGrid | `map/plot-layout.json` | 24 格 rect/center（720×1280 设计坐标，×2 对齐底图），格心即 Plot 锚点 |
+| Plot 状态 | `plots/` 6 件 | locked / grass_empty / tilled_empty 底座 + wet / ripe / selected 覆盖层 |
+| Crop | `crops/{crop}_stage1..4` | 5 作物 × 4 阶段（播种/幼苗/生长/成熟） |
+| SceneProps | `scene-modules/` 10 件 | 农舍×2 / 水井 / 栅栏×3 / 池塘 / 灌木 / 干草堆 / 木牌 |
+| 特效 | `effects/` 5 组 | 收获爆发 / 种植尘土 / 浇水水花 / 金币飞行 / 升级徽章（单帧，帧序列待扩展） |
+
+注意：`assets/game/`（G3 会话 `slice-assets.py` 产出、client-mini resources 引用）与 `assets/sprites/v13/` 并存——v13 是按 12 层模型的完整版素材库，`assets/game/` 是当前工程已接线的子集；后续以 v13 为准逐步替换，不要双源头同时演进。
+
 ## 7. 客户端验收清单
 
 ### 资源和视觉
