@@ -529,7 +529,8 @@ wx transport **真机**回归（模拟器已验证的 wx-compat 需在真机网�
 | `pnpm -r test` | 单测+集成 | ✅ **111/111**（shared 31 + server 44 + mini 29 + app 7；e2e 真实双进程含新 unlock 场景） |
 | shared build → build:cocos → Cocos CLI 构建 | 完整构建链 | ✅ 6.6s，产物 81 PNG + 1 JPG + 脚本包齐全 |
 | 包体（U17） | build/wechatgame | 总 11MB：**debug 引擎 7.2MB**（release+裁剪是 G4 事项）、resources 2.3MB、main 744KB、internal 740KB；素材达预算，parallax 远程包切分暂不需要 |
-| 模拟器 E2E + 三尺寸走查（U15） | DevTools | ⏳ 被 §14.4 GUI 阻塞 |
+| 模拟器 E2E（功能闭环 种→浇→收→解锁） | DevTools + dev bridge | ✅ **28/28**（2026-09-13，`scripts/farm-sim-bridge-e2e.mjs`） |
+| 三尺寸视觉走查（U15 剩余） | DevTools GUI | ⏳ 需一次 GUI 授权（截图）或屏幕录制权限，见 §14.4 |
 
 ### 14.3 遗留缺陷（不阻塞）
 
@@ -546,5 +547,16 @@ wx transport **真机**回归（模拟器已验证的 wx-compat 需在真机网�
 **仍待解决（不阻塞主页 UI 实施）**：
 
 - **真机 G4**：需正式 AppID（已收到 `wx39a9fdbb628725fd`，但需上传审核后才能真机预览）+ 真机调试基线。
-- **模拟器 E2E 在 Stable 2608070 上 `miniprogram-automator` 协议对小游戏全面超时**（`checkVersion` 过、evaluate/screenshot 全超时；§11.6③）。E2E 退化为「启动 IDE + 人工点编译 + 看遥测/psql」。`scripts/farm-sim-telemetry.mjs` 在 `127.0.0.1:9877` 提供 HTTP console fallback 通道。
 - **G1.5 真实微信登录**：需要凭据，与上述阻塞独立。
+
+**2026-09-13 第二轮：E2E 阻塞解除 + 1 个真 bug（详见 runbook §11.4 / §11.6③ / §11.7 / §11.8）**
+
+1. **无人值守启动解锁**：`cli auto … --trust-project`（+ 设置里"自动化接口打开工具时默认信任项目"）。此前"headless 模拟器不编译"的根因就是「信任项目」弹窗——不带该 flag 时 launch/checkVersion 全过、端口全监听，但模拟器零 console、2567 无连接。带上后自动编译 + 自动启动 + 自动连后端。
+2. **真 bug：素材 spriteFrame 全缺**。80 个图片 meta 是 `texture` 类型，而加载器对每个 key 都要 `game/<key>/spriteFrame` → 第一个 key（`map/base`）就 `boot failed`，首页根本渲染不出来（此前从未在模拟器里跑过，所以没暴露）。修复：`scripts/fix-cocos-sprite-metas.mjs`（meta → sprite-frame）+ Cocos 重建；运行期 `加载贴图 53/53`，console 无错。
+3. **headless E2E 用 dev bridge 收口**：automator 对小游戏只有 `Tool.*` 层可用（`App.*` 由 IDE 自己回 `timeout waiting for automator response`，§11.6③）。改为 `scripts/farm-sim-telemetry.mjs`（9877）+ 补丁脚本注入 `game.js` 的命令轮询做输入通道：`node scripts/farm-sim-bridge-e2e.mjs` = fixture 复位 → 种 → 浇 → 31s 成熟 → 收 → 解锁，每步 UI（`__farm.state()`）/ DB（psql）双断言 + console 基线。**2026-09-13 实测 28 pass / 0 fail**。
+   - 注意：沙箱禁用 `Function`/`eval`（反 tamper 桩），桥只能按路径 `get`/`call`，不能跑任意表达式。
+4. **仍未覆盖**：**三尺寸视觉走查（U15 剩余部分）**——截图与设备尺寸切换都属 GUI：IDE 侧 `simulator_screenshot` / `automation_game_action` 需要一次授权弹窗（`wechatide`，§11.8，本机截止发稿仍是 pending），OS 整屏 `screencapture` 被 macOS 屏幕录制权限挡住（实测黑屏）。桥可读 `cc.director`，程序化布局审计具备条件（尚未实现）。
+5. **地块连片重构**（用户反馈"地块要相邻"）：24 格由散格（格心距 70.7×90，行间露草缝）改为 **6×4 无缝整块**——pitch 75×47 取自贴图可见几何（顶面 42.6 + 正面 4.5；宽度取最窄贴图 74.9），整块居中于底图留白区。命中盒同步改为格距尺寸（原 85×85 在 47 行距下会前排偷后排的点击），倒计时标签 46×18 收进格内。坐标由新增 `scripts/make-plot-layout.mjs` 生成（参数化，便于后续放大/改排布）。E2E 复跑 **28/28 通过**。
+
+6. **M5 完成度追赶**（用户反馈"参考视频差距大"）：4 步改动 — 场景道具+远山+池塘水波全开 / 底栏 4 圆角彩色按钮 / 侧栏 4+3 按钮接 kit 图标 / 解锁弹窗"再想想"升级；详见 [cocos-runbook.md §11.10](./cocos-runbook.md)。过程中被用户提醒"自己检查下，素材都失真了"——才发现 dump 验证不等于视觉验证。截图发现 3 个隐藏 bug（24 块 lock 默认 visible / 金条字对比度低 / LoadingCover 销毁依赖 server）+ 1 个 v13 baseline 命名错误（`ui_panel_gold_bar` 实际是等级木牌不是金币木牌）。**新增经验**：debug 模拟器 sprite 加红色 AABB outline + 节点浮层 + `frame-time` 浮层，**截图不能作为视觉验收基线**——所有未来"自动收口"流程都应加 release 模拟器截图步骤。
+7. **G4 4MB 限制发现**（用户提"试试上传"）：真机调试 `Error: 80051, source size 10365KB exceed max limit 4MB`。debug build 11MB、release build 7.3MB 仍超 4MB。包体构成：cocos-js 2.8M（引擎）+ resources 2.6M（美术）+ internal 0.6M + main 0.3M。**真正的卡点：引擎裁剪需要 GUI 操作**（Cocos Creator「项目设置 → 引擎管理」勾掉 audio/3d/physics/spine/tiledmap 等），CLI 不能改 `engine.json excludeModules`。d5fcbbb commit 时就标"release+裁剪是 G4 事项"——这是历史遗留，非 M5 引入。**新建** `scripts/patch-release-build.mjs`（不注入 dev bridge、不强制 enhance=false，release bundle 已 minify）—— release build 跑通，但 4MB 限制解决仍需 GUI 引擎裁剪。

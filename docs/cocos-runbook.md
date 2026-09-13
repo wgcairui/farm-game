@@ -498,18 +498,23 @@ A: 正常（见 §5.3 + §8）。先 `Cmd+S` 保存场景，编辑器顶部「�
 - `overlay_selected.png` 被 v13 素材管线**排除**（实为沙堆误图，含键控残留）；选中框由 `farm/widgets.ts selectionRing()` 程序化绘制。
 - 场景几何唯一来源：`assets/scripts/farm/layout.ts`（720×1280 Fit-Height、中心原点坐标、Widget 规格、D–G 场景层开关）。
 
-### 11.2 构建链（不变 + 一步 patch）
+### 11.2 构建链（2026-09-13 更新：+素材 meta 修正 +补丁脚本）
 
 ```
 pnpm --filter @farm-game/shared build            # vendor bundle 吃 dist/
 pnpm --filter @farm-game/client-mini build:cocos # assets/scripts/vendor/farm-online.js
+node scripts/fix-cocos-sprite-metas.mjs          # 素材 meta: texture → sprite-frame（§11.7，幂等）
 /Applications/CocosCreator.app/Contents/MacOS/CocosCreator --project \
   /Users/cairui/Code/farm-game/packages/client-mini \
   --build "platform=wechatgame;debug=true;startScene=1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
-# 构建后两个 patch（都因为构建产物被重置）：
-#   project.config.json: urlCheck=false；appid=touristappid（见 §11.3）
-#   game.json: 删除 networkTimeout 字段（见 §11.5）
+node scripts/patch-wechat-build.mjs              # 构建产物被重置，必须重跑（幂等）
+#   project.config.json: urlCheck=false / enhance=false / appid=wx39a9fdbb628725fd / libVersion=3.17.2（§11.3）
+#   game.json: 删除 networkTimeout 字段（§11.5）
+#   game.js: console 遥测 + dev bridge 命令轮询（§11.4）
+node scripts/farm-sim-telemetry.mjs              # 常驻：9877 观测/驱动通道（§11.4）
 ```
+
+Cocos CLI 构建**成功也会以非 0 退出码结束**（子进程 SIGTERM 收尾，实测 exit 36）；判定标准是日志末行 `build Task (wechatgame) Finished in (…)ms` 与产物时间戳，不是退出码。
 
 构建期出现一条 `Missing class: 6f4c2oeiz1MWaLnnwscLT5P` 警告是 builder 统计阶段的库缓存噪音（压缩 uuid 即 OnlineFarm 组件），产物中已正确注册，可忽略。
 
@@ -540,15 +545,120 @@ pnpm --filter @farm-game/client-mini build:cocos # assets/scripts/vendor/farm-on
 - 解法：用 **`Stable 2.02.2608070`（2026-09-07）替换**。homebrew cask `wechatwebdevtools` 当前指向同一版本（`formulae.brew.sh/api/cask/wechatwebdevtools.json`），dmg 直链 `https://dldir1.qq.com/WechatWebDev/release/be1ec64cf6184b0fa64091919793f068/wechat_devtools_2.02.2608070_darwin_arm64.dmg`，sha256 `911600453eacc4e7c7b64366719bc8d0151bd5bdb36d7816ca17fc0881dcc681`。旧 RC 备份在 `/tmp/wechatwebdevtools-rc-2.02.2607171-backup.app` 可回滚。
 - 替换应用后**必须重新微信扫码登录**（登录态随应用存储），否则 `cli open` 报 `不存在此 AppID (code 10)`——此错在登录态缺失时与 §11.3 同形，注意区分。
 
-**③`miniprogram-automator` 协议超时（小游戏专用）**
+**③`miniprogram-automator` 对小游戏只剩 Tool.* 层（2026-09-13 定论）**
 
-- 在 Stable 2.02.2608070 上，**所有 automator 命令（`evaluate`、`screenshot`）一律 `timeout waiting for automator response`**：`checkVersion` 通过、TCP 握手完成，但 subcontext 内的游戏 context 在 evaluate 调用上不响应——可能与 ②同源的 subcontext 隔离策略有关。
-- **结论：本环境 headless 自动化跑不通模拟器小游戏**。`scripts/farm-sim-e2e.mjs` 退化为「启动 IDE 后观察遥测 + psql 断言」的组合。`scripts/farm-sim-telemetry.mjs`（127.0.0.1:9877 HTTP 接收 game.js 转发）作为 IDE 调试器不可用时的 fallback console 通道，已写入 `scripts/patch-wechat-build.mjs` 的 game.js 注入块。
+- 分层实测（`DEBUG=automator:protocol` 原始帧 + `scripts/farm-automator-split-probe.mjs`）：
+  - `Tool.*`（IDE 级：`Tool.getInfo` / `Tool.getTestAccounts`）**1ms 内应答**——`checkVersion` 因此总是通过，容易误判"协议正常"；握手（TCP+WS）也始终成功。
+  - `App.*`（游戏运行时节：`App.callFunction` / `App.captureScreenshot` / `App.getPageStack`）**全部超时**，而且超时是 **IDE 自己产生的**：约 2s 后回 `{"error":{"message":"timeout waiting for automator response"}}`（asar 内该字符串出自 `send_to_devtools_message` 的等待分支），不是客户端超时。
+- 机制推断：IDE 把 `App.*` 转发给游戏运行时，由运行时侧 automator 客户端应答；小游戏侧没有应答端。已逐一排除的变量：`useIsolateContext`（true/false）、`enhance`、libVersion、新 IDE 会话 + `--trust-project`、游戏已在跑且已连后端、automator 0.12.1（wxgame-mcp 用 0.11.x 且声称 Stable 2.01.2510xxx 可用——版本相关，本项目不再投入）。
+- 替代：headless 功能验收走 §11.4 的 dev bridge；截图/画布触摸走官方 agent 工具面（§11.8）。
 - 真机调试不需要这条（真机协议是 wx.login/wx.connectSocket/wx.onShow/wx.requestMessageChannel），G4 上 OK。
 
-### 11.4 自动化 E2E（headless 联调验收）
+### 11.4 headless E2E：dev bridge（2026-09-13 起为默认路径，实测 28/28）
 
-- `scripts/farm-sim-e2e.mjs`：连/拉起 IDE（automator launch，端口 9421）→ console 基线断言 → `globalThis.__farm.actions` 驱动 种→浇→收→解锁 → 每步 psql 断言 → 截图 `/tmp/farm-sim-home.png`。
-- `scripts/farm-sim-probe.mjs`：自动化诊断探针（launch → 3 分钟轮询后端连接 → evaluate）。判定标准：**模拟器真正跑起来的唯一铁证是 wechatweb 进程与 2567 端口建立 ESTABLISHED**；IDE 的 `✔ auto` / `checkVersion` 通过都只代表 IDE 层。
-- 已知边界（2026-09-12 → 13）：**Stable 2.02.2608070 上 automator 协议对小游戏全面超时**（详见 §11.6③），headless 路径已弃用。E2E 改成「启动 IDE + 人工点编译 + 看遥测/psql」三步法；后续若 IDE 修复，重新评估。
-- automator 的 `mini.evaluate` 需要游戏 context 存活；`automator` 内部有 background rejection，脚本需挂 `process.on('unhandledRejection')` 兜底（两脚本均已挂）。
+**①无人值守启动（关键开关 `--trust-project`）**
+
+```bash
+/Applications/wechatwebdevtools.app/Contents/MacOS/cli auto \
+  --project /Users/cairui/Code/farm-game/packages/client-mini/build/wechatgame \
+  --auto-port 9422 --trust-project
+```
+
+- **不带 `--trust-project` 时 IDE 停在「信任项目」弹窗**：`launch`/`checkVersion` 照常通过、端口照常监听，但模拟器不编译——零 console、2567 无连接。"headless 跑不起来"的真根因就是这个弹窗（曾经归因于首启对话框，方向对但开关没找对）。
+- 带它之后实测：项目自动编译 + 游戏自动启动 + 自动连上后端，全程无人值守。
+- `cli` 官方文档没写这个 flag，`cli auto -h` 里有（`--trust-project  Trust Project [boolean]`）；wxgame-mcp 的配方同样依赖它 +「设置 → 安全 → 自动化接口打开工具时默认信任项目」。
+- 每次 Cocos 构建会重置构建产物，**必须先 `node scripts/patch-wechat-build.mjs`**（否则 appid 变残留值 → `code 10`，见 §11.3）。
+
+**②观测 / 驱动通道：dev bridge（`scripts/farm-sim-telemetry.mjs`，127.0.0.1:9877）**
+
+- 补丁脚本往 `game.js` 注入两段（幂等；bridge 段每次运行自动与新定义同步）：console 转发 + **命令轮询**（`GET /cmd` → 执行 → `POST /result`，400ms 间隔）。
+- 命令种类：`state` = `__farm.state()`；`action` = `__farm.actions.{plant,water,harvest,unlock}`；`get` / `call` = 按点号路径读取/调用（例：`{"kind":"call","path":"__farm.app.refresh"}`）。驱动侧 HTTP：`POST /enqueue` 入队、`GET /result/:id` 取结果、`GET /lines?since=N` 取 console、`GET /health`（`gameListening` 表示游戏在轮询）。
+- **沙箱禁用动态代码生成**：devtools 的 game sandbox 把 `Function` 换成反 tamper 桩（`new Function(...)` 返回**非函数**，报 `fn is not a function`），`(0, eval)` 也不是函数。所以桥**不能用 eval/表达式**，只能路径派发——官方 automator 的 `evaluate` 走的是 IDE debugger 特权通道，桥不是。
+- 循环引用/大对象：桥侧 `safeResult()` 折叠成 `{__summary,__type,__keys}` 再回传；否则 `wx.request` 序列化抛错会表现为"命令丢失"（driver 侧只看到超时）。实测 `cc` / `cc.director` / `GameGlobal.cc` / `__farm.app` 都可达（只是不可序列化）——**场景图审计具备条件**。
+
+**③验收脚本：`node scripts/farm-sim-bridge-e2e.mjs`**
+
+- 流程：bridge 健康检查 → console 基线（`已连接服务端`、无 `boot failed` / `missing sprite frame` / 未处理拒绝）→ SQL fixture 复位（plot 0 空、plot 6 锁，保证跨运行幂等）→ 种（−10 金）→ 浇（revision 递增）→ 31s 成熟 → 收（+25 金）→ SQL 补金 + refresh → 解锁（−100 金）→ 每步 UI（`__farm.state()`）与 DB（psql）双断言。
+- **2026-09-13 实测 28 pass / 0 fail**。
+- 旧的 automator 版 `scripts/farm-sim-e2e.mjs` 保留作历史参考（本环境跑不通，§11.6③）；`scripts/farm-automator-split-probe.mjs` 是分层诊断探针（Tool.* vs App.*）。
+- 仍需人工/GUI：**截图**（`simulator_screenshot` → §11.8 授权；OS 整屏 `screencapture` 被 macOS 屏幕录制权限挡住，本机实测黑屏）与**设备尺寸切换**（375/390/430 是 IDE GUI 动作）。
+- automator 内部有 background rejection，凡直接用它仍需 `process.on('unhandledRejection')` 兜底。
+
+### 11.7 素材 meta 导入类型：`texture` vs `sprite-frame`（2026-09-13 实战）
+
+- 症状：模拟器 `[OnlineFarm] 加载失败: missing sprite frame: game/map/base (Error: Bundle resources doesn't contain game/map/base/spriteFrame)` → `boot failed`，首页整个出不来。
+- 放大效应：加载器 `assets/scripts/farm/assets.ts` 对**每一个** key 都请求 `game/<key>/spriteFrame`，`map/base` 只是列表第一个——**失败即中断**，后面的问题不会逐个暴露（所以只看 console 会误以为只有一张图坏了）。
+- 根因：项目里 80 个图片 `.meta` 全是 `"type": "texture"`（没有 `<uuid>@f9941` 子资源）。`spriteFrame` 子资源只在 `userData.type === "sprite-frame"` 时由导入器生成。
+- 解法：`node scripts/fix-cocos-sprite-metas.mjs`（幂等：改 `userData.type`、补 `subMetas.f9941`，宽高从 PNG IHDR / JPEG SOFn 解析）→ 再跑 Cocos CLI 构建，由导入器补齐子资源。
+- 验证：构建产物 `assets/resources/config.json` 的 `paths` 应出现 `<uuid>@f9941 → ['game/map/base/spriteFrame','cc.SpriteFrame']`（本次 80/80 素材 texture+spriteFrame 双条目齐全）；运行期 console 出现 `[OnlineFarm] 加载贴图 53/53…`。
+- 顺序：`prepare-cocos-assets.py`（重生成图片，会带出 texture 类型 meta）→ `fix-cocos-sprite-metas.mjs` → Cocos 构建 → `patch-wechat-build.mjs`。素材管线重跑后**不要跳过**第二步。
+
+### 11.8 官方 agent 工具面（截图 / 画布触摸的正路，需一次 GUI 授权）
+
+- IDE 自带 skill 包与 CLI（v0.3.9）：`/Applications/wechatwebdevtools.app/Contents/Resources/app.asar.unpacked/wechatide-skill/`；入口 `wechatide`（在 app 包内 `/Applications/wechatwebdevtools.app/Contents/MacOS/wechatide`，检查脚本 `skills/installer/scripts/check-installation.mjs` 会给出绝对路径；DMG 安装常需 `ensure-cli-path.mjs` 建软链）。
+- 调用：`wechatide -c <clientName> <toolName> --project <path> [--token …]`。小游戏可用工具（官方 `skills/automator/SKILL.md` 明确）：`simulator_screenshot`（默认优化尺寸，返回 path + imageWidth/Height）、`automation_game_action`（**画布坐标** tap/swipe/touch*，可 `coordinateSpace=image` 按截图换算）、`automation_evaluate`、`automation_wx_api`、`compiler` 的 `simulator_refresh`。小游戏**不要**用 `automation_navigate` / `automation_element_action` / `automation_page_action` / `automation_runtime_info`（无页面栈/WXML）。
+- **门禁（本机 2026-09-13 状态：pending）**：首次调用返回 `{"status":"pending","taskId":"auth_…"}`，需在 IDE 授权弹窗点允许（`-c` 的 clientName 必须与弹窗一致）；放行结果用 `wechatide -c <c> polling_task_result --task-id <id>` 轮询。这是人工动作：agent 不应代点，也不要从工具侧翻 token（官方文档 line: 禁止自行从开发者工具侧翻找）。
+- `cli agent tool --name <tool>` 是同一工具面的 CLI 入口，但**本地技能解析写死读小程序的 `app.json#agent.skills`**；小游戏项目没有 `app.json` → `ENOENT …/app.json`，故小游戏只能用 `wechatide`。
+- 授权未放行期间的替代：功能验收走 §11.4 的 bridge；布局/尺寸这类"看图"检查改走桥的 `get`/`call`（`cc.director` 可达）或等授权后截图。
+
+### 11.9 地块连片布局契约（2026-09-13）
+
+- 症状：24 格看起来是"散开的格子"，不是一整片耕地。
+- 根因：格心距来自旧 rect 网格（70.7×90），行距 90 远大于贴图可见高 52 → 每行之间露 ~38px 草缝。
+- 契约（改布局只走这三步，别手改坐标）：
+  1. `node scripts/make-plot-layout.mjs`（可带 `--cols/--rows/--pitch-x/--pitch-y`）同时写源文件 `assets/sprites/v13/map/plot-layout.json` 与资源副本 `packages/client-mini/assets/resources/game/plot-layout.json`；默认 6×4、pitch 75×47、整块居中 `lawn_region_720`。
+  2. pitch 推导：`plot_grass_empty.png` 在 88px 显示下不透明盒 81×55，其中顶面 42.6 + 棕色正面 4.5（其余是投影）→ **pitchY = 顶面+正面 = 47**（每排盖住后排投影、露出自己的正面）；**pitchX = 75**（最窄的 `plot_tilled_empty` 可见宽 74.9，取小值才不露缝）。
+  3. `plotView.ts`：命中盒 = `cell_size_720`（与格子一一对应，零重叠；原来的 85×85 在 47 行距下会让前排偷走后排点击），倒计时标签 46×18 收进格内 `(0, +23)`。
+- 生效链：改脚本 → 重生成 JSON → **Cocos 构建**（`plot-layout.json` 是打包进 bundle 的 JsonAsset，只改文件不重建不生效）→ `patch-wechat-build.mjs` → IDE 重编译。
+- 验证：桥 `dump` 应返回 `x pitch: [75]`、`y pitch: [47]`、`Hit sz [75,47]`。
+
+### 11.10 M5 完成度追赶（2026-09-13）+ 模拟器截图盲点 + G4 4MB 限制
+
+> 用户反馈参考视频完成度差距后，做了 4 步追赶。期间被用户提醒"自己检查下，素材都失真了"——这才发现 **dump 验证不等于视觉验证**。本节记录截图发现的 3 个隐藏 bug + G4 真机 4MB 限制的处理路径。
+
+**M5 四步改动**（代码详见 `git log --grep M5`）：
+
+- **M5-A 场景道具 + 远山 + 池塘水波**：`SHOW_PARALLAX/WATER/PROPS` 全开（之前 baseline 都是 false），19 个 prop（3 远景小屋 + 5 中景围栏/树丛/牌子/井 + 4 近景莲花/桥 + 2 装饰石）分 3 层（far/mid/near）按 z-order 挂在 PlotGrid 之前/之后。dev-only 守门：`assertOutsideLawn()` 抛 throw 防止坐标踩地块。
+- **M5-B 底栏 4 圆角彩色按钮**（仓库/商店/宠物/装扮）：替换原 5 键圆形占位（首页/仓库/种子/好友/更多），接 `ui_btn_round_red` kit 素材。
+- **M5-C 侧栏 4+3 按钮接 kit 图标**（分享/音乐/菜单/相机 + 商城/萌宠/提篮）：替换原 7 圆形占位，接 `ui_icon_*` + `icons/seed_bag`。
+- **M5-D 解锁弹窗"再想想"升级**为 `ui_btn_close` 72×72 × 按钮（主"开垦"按钮在 d5fcbbb 已接 `ui_btn_confirm`）。
+
+**截图发现的 3 个隐藏 bug**（被用户戳"自己检查下"后才发现——d5fcbbb 当时没人截屏验证）：
+
+1. **24 块全显示「100 金币 lock」**：根因 `OnlineFarm.refreshAll()` 只在 `app.start()` 成功后调，但 devtools 模拟器对 127.0.0.1 域 wx.request 拦截 → `app.start()` 永远失败 → `refreshAll()` 永远不跑 → PlotView 一直用构造时的默认 `lockIcon.enabled = true` + `priceLabel.active = true`。**修复**：`plotView.ts` 构造时 `lockIcon.enabled = false` + `priceLabel.node.active = false` + `setVisible()` 同步管理 `sprite.enabled`。
+2. **金币/钻石木牌里的「0」字看不清**：`hud.ts` 浅黄字 `(255, 236, 160)` 配 332×357 浅米色木牌，对比度低。**修复**：label color 改深棕 `(80, 50, 15)` + 字号 32pt + 位置 `(0, 6, 0)`。
+3. **LoadingCover 销毁依赖"已连接服务端"**：devtools 模拟器永远连不上 → cover 永远挡住 → 截图只见蓝屏。**修复**：`OnlineFarm.setStatus` 改为「加载贴图 N/N 完成」即销毁 cover。
+
+**v13 batch H baseline 命名错误**：`ui_panel_gold_bar.png` / `ui_panel_cash_bar.png` 实际是**等级木牌**（带星星等级数），不是金币/钻石木牌。v13 batch H 当时命名错（d5fcbbb commit 之前就埋了）。当前 HUD 沿用旧命名（等级木牌暂代金币/钻石木牌），等 v13 批次重生成真木牌或换用 v8 切图。
+
+**G4 4MB 限制 + release build 现状**（用户提"试试上传"才暴露）：
+
+- 错误：`Error: 上传失败: 网络请求错误, ([object Object]) 系统错误, 错误码: 80051, source size 10365KB exceed max limit 4MB`
+- 当前 release build 7.3MB（debug 11MB）但仍超 4MB。
+- 包体构成：`cocos-js/_virtual_cc` 2.8M（引擎）+ `assets/resources` 2.6M（美术）+ `assets/internal` 0.6M + `assets/main` 0.3M。
+- **release 跑通**：`/Applications/CocosCreator.app/Contents/MacOS/CocosCreator --project <dir> --build "platform=wechatgame;debug=false;startScene=1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"`。
+- **release patch 脚本**：`node scripts/patch-release-build.mjs`（基于 `patch-wechat-build.mjs` 改造，但**不注入** dev bridge/telemetry、**不强制** `enhance=false`——release bundle 已 minify）。
+- **真正的卡点：引擎裁剪需要 GUI 操作**（Cocos Creator「项目设置 → 引擎管理」勾掉 audio/3d/physics/spine/tiledmap/video/webview 等不需要的模块），CLI 不能改 `engine.json excludeModules`。**这是 G4 事项，不是 M5 范围**——d5fcbbb commit 时就标"release+裁剪是 G4 事项"。
+- 进一步拆分：把 `assets/resources` 2.6M 拆到 subpackage 上 CDN（d5fcbbb progress 文档："parallax 远程包切分暂不需要"），Cocos 2.4 builder.json 加 `subpackages: [{name: "resources", root: "assets/resources"}]`，但这也要 GUI 配置。
+
+**模拟器截图盲点**（对所有未来的"自动验收"流程都重要）：
+
+- Cocos 模拟器 **debug build** 下每个 sprite 都加红色 AABB outline + 节点名浮层；`Frame time`/`Framerate`/`Draw call` 等浮层常驻显示。
+- 这意味着 debug build 截图**不能**用于视觉验收——所有 sprite 都会带"红边"误导观感。
+- `wechatide simulator_screenshot` 在 debug build 下截的图是 **cache frame**（dump 看到 v=0 但 GPU framebuffer 仍画旧 sprite，两者不同步，疑似 GLES frame swap 延迟）。
+- **真机/真图验收**要么：a) 真机 G4（需要 release + 引擎裁剪 + 4MB 包体限制解决）；b) **Release 模拟器**（无 debug 浮层 + sprite outline 消失，**但仍有 frame cache 延迟问题**）。
+- **未来应改**：收口流程加一步「release build 模拟器截图」作为视觉验收基线（之前 d5fcbbb 没做过，所以 24 块 lock bug 一直藏到今天）。
+
+**M5 改动验证**：
+
+| 验证项 | 结果 |
+|---|---|
+| `tsc -p packages/client-mini --noEmit` | ✅ EXIT 0 |
+| `pnpm --filter @farm-game/client-mini test` | ✅ 29/29 |
+| 桥 `dump` MapRoot 子树 | ✅ ParallaxBack=4 / SceneModules_Far=4 / SceneModules_Mid=12 / SceneModules_Near=7 / WaterLayer=2 / PathLayer=5 / PlotGrid=241 |
+| 桥 `dump` ScreenUI 子树 | ✅ Nav_仓库/商店/宠物/装扮 各 3 子节点 / Btn_商城/萌宠/提篮 各 4 / Rail_分享/音乐/菜单/相机 各 3 |
+| 桥 `dump` Plot_0 Lock/Price | ✅ v=0（修复生效） |
+| 桥 `dump` LoadingCover | ✅ 不存在（已销毁） |
+| Release build (debug=false) | ✅ 7.3MB（debug 11MB），但仍超 4MB |
+| G4 真机上传 | ❌ **80051 / 4MB 限制**（G4 阻塞，需 GUI 引擎裁剪） |
+| 模拟器视觉验收（debug 模拟器） | ⚠️ 受 debug 浮层 + sprite outline + frame cache 延迟干扰，不能做最终视觉基线 |
