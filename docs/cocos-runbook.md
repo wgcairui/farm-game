@@ -508,6 +508,7 @@ pnpm --filter @farm-game/client-mini build:cocos # assets/scripts/vendor/farm-on
   --build "platform=wechatgame;debug=true;startScene=1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
 # 构建后两个 patch（都因为构建产物被重置）：
 #   project.config.json: urlCheck=false；appid=touristappid（见 §11.3）
+#   game.json: 删除 networkTimeout 字段（见 §11.5）
 ```
 
 构建期出现一条 `Missing class: 6f4c2oeiz1MWaLnnwscLT5P` 警告是 builder 统计阶段的库缓存噪音（压缩 uuid 即 OnlineFarm 组件），产物中已正确注册，可忽略。
@@ -517,9 +518,37 @@ pnpm --filter @farm-game/client-mini build:cocos # assets/scripts/vendor/farm-on
 - Cocos 构建产物会把 `project.config.json#appid` 写成历史残留值（本机出现过 `wx6ac3f5090a6b99c5`）。该 AppID 不属于当前登录账号时，`cli open/auto` 报 **`不存在此 AppID 请检查后重新输入 (code 10)`**，项目窗口根本不打开，且 CLI 退出码为 0、只有 stderr 里有 `[error]`——**极易误判为打开成功**。
 - 解法：构建后把 appid patch 成官方测试号 **`touristappid`**（模拟器足够；真机才需要正式 AppID）。
 
+### 11.5 game.json networkTimeout 校验误报（2026-09-12 实战）
+
+- Cocos 构建产物 `game.json` 自带 `networkTimeout.downloadFile: 500000`。文件本身是合法 JSON object，但开发者工具（mg.2.02.2607171 / lib 3.17.2）编译报 **`game.json: networkTimeout 字段需为 object`**，值超常规档位（官方默认/上限 60000ms 一档）疑似触发校验器误报。
+- 该字段不承重：wx-compat/SDK 自带连接超时，默认 60s 足够。解法：构建后**删除 `networkTimeout` 字段**，只留 `deviceOrientation`，回 DevTools 重新「编译」即过。
+
+### 11.6 新基础库（3.17.x subcontext）适配坑（2026-09-13 实战）
+
+**①裸 `Component` / `global` 不再是全局**
+
+- 旧基础库把 `Component` / `global` / `window` / `canvas` 当全局变量注入 sandbox，新基础库（3.17.2 / 3.17.3）subcontext 把它们收到 `GameGlobal` 后端 getter 下，sandbox 内的裸名解析是 `undefined`。
+- 表现：`ReferenceError: Component is not defined`（`assets/main/index.js:16988`）/`global is not defined`（`cocos-js/system-bundle.js:12`）/ `Cannot read properties of undefined (reading 'devicePixelRatio')`（`game.js:134`）。
+- 解法（一次性，固化进 `scripts/patch-wechat-build.mjs`）：
+  - 源码侧：所有 `extends Component` / 引用 `global` 的 ts 文件必须在 `import { ... } from 'cc'` 中显式列 `Component`（`OnlineFarm.ts:21` 漏了，`/Users/cairui/Code/farm-game/packages/client-mini/assets/scripts/OnlineFarm.ts` 已修）。
+  - 构建产物侧：`game.js` 入口在 `__initApp()` 顶部加 `GameGlobal.global = GameGlobal;`（仅一行，无副作用，给 `cocos-js/system-bundle.js` 的裸 `global` 用）。
+
+**②IDE 版本选择（RC 2.02.2607171 必炸）**
+
+- RC 2.02.2607171 的 `SummerCompiler.getAllPageAndComponent` 硬编码按小程序取 `Object.keys(e.pages)`，小游戏项目 `GameConf.getConf` 只返回 `{app, packages}` → `pages=undefined` → `Object.keys(undefined)` 抛 `Cannot convert undefined or null to object`，**任何小游戏项目必白屏**（同 bundle 里 `getAllSortedJSFiles` 等其它方法都有空值保护，唯独这一处漏）。
+- 编译产物反编译证实：asar 内 `app.asar` 的 `OriginalCompiler` 实现是安全的，问题只在 `SummerCompiler`。
+- 解法：用 **`Stable 2.02.2608070`（2026-09-07）替换**。homebrew cask `wechatwebdevtools` 当前指向同一版本（`formulae.brew.sh/api/cask/wechatwebdevtools.json`），dmg 直链 `https://dldir1.qq.com/WechatWebDev/release/be1ec64cf6184b0fa64091919793f068/wechat_devtools_2.02.2608070_darwin_arm64.dmg`，sha256 `911600453eacc4e7c7b64366719bc8d0151bd5bdb36d7816ca17fc0881dcc681`。旧 RC 备份在 `/tmp/wechatwebdevtools-rc-2.02.2607171-backup.app` 可回滚。
+- 替换应用后**必须重新微信扫码登录**（登录态随应用存储），否则 `cli open` 报 `不存在此 AppID (code 10)`——此错在登录态缺失时与 §11.3 同形，注意区分。
+
+**③`miniprogram-automator` 协议超时（小游戏专用）**
+
+- 在 Stable 2.02.2608070 上，**所有 automator 命令（`evaluate`、`screenshot`）一律 `timeout waiting for automator response`**：`checkVersion` 通过、TCP 握手完成，但 subcontext 内的游戏 context 在 evaluate 调用上不响应——可能与 ②同源的 subcontext 隔离策略有关。
+- **结论：本环境 headless 自动化跑不通模拟器小游戏**。`scripts/farm-sim-e2e.mjs` 退化为「启动 IDE 后观察遥测 + psql 断言」的组合。`scripts/farm-sim-telemetry.mjs`（127.0.0.1:9877 HTTP 接收 game.js 转发）作为 IDE 调试器不可用时的 fallback console 通道，已写入 `scripts/patch-wechat-build.mjs` 的 game.js 注入块。
+- 真机调试不需要这条（真机协议是 wx.login/wx.connectSocket/wx.onShow/wx.requestMessageChannel），G4 上 OK。
+
 ### 11.4 自动化 E2E（headless 联调验收）
 
 - `scripts/farm-sim-e2e.mjs`：连/拉起 IDE（automator launch，端口 9421）→ console 基线断言 → `globalThis.__farm.actions` 驱动 种→浇→收→解锁 → 每步 psql 断言 → 截图 `/tmp/farm-sim-home.png`。
 - `scripts/farm-sim-probe.mjs`：自动化诊断探针（launch → 3 分钟轮询后端连接 → evaluate）。判定标准：**模拟器真正跑起来的唯一铁证是 wechatweb 进程与 2567 端口建立 ESTABLISHED**；IDE 的 `✔ auto` / `checkVersion` 通过都只代表 IDE 层。
-- 已知边界（2026-09-12）：CLI/automator 全流程在**无人值守**环境下卡在「模拟器窗口不编译」——launch/checkVersion 正常但 simulator 零 console、零连接（疑似首启 GUI 弹窗阻塞，需人眼看一次窗口）。人工打开 IDE 确认弹窗后，自动化路径即可恢复。
+- 已知边界（2026-09-12 → 13）：**Stable 2.02.2608070 上 automator 协议对小游戏全面超时**（详见 §11.6③），headless 路径已弃用。E2E 改成「启动 IDE + 人工点编译 + 看遥测/psql」三步法；后续若 IDE 修复，重新评估。
 - automator 的 `mini.evaluate` 需要游戏 context 存活；`automator` 内部有 background rejection，脚本需挂 `process.on('unhandledRejection')` 兜底（两脚本均已挂）。

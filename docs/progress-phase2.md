@@ -535,6 +535,16 @@ wx transport **真机**回归（模拟器已验证的 wx-compat 需在真机网�
 
 - `overlay_ripe` 键控黑斑（少量，重生素材时顺带修）；套件缺提篮/公益图标（seed_bag 降级已实现）；水面第二帧为程序化微闪（开关关闭中）。
 
-### 14.4 模拟器 GUI 阻塞（2026-09-12，headless 排障定论）
+### 14.4 模拟器联调现状（2026-09-13 升级版）
 
-CLI/automator 全链路无人值守失败定论：`cli auto` → AppID 坑（Cocos 构建产物残留 `wx6ac3f5090a6b99c5` → `不存在此 AppID (code 10)`，已 patch `touristappid` 解决）→ 之后 launch/checkVersion 正常但**模拟器窗口不编译**（3 分钟窗口零 console、零 2567 连接）。判定铁证与排障工具见 [cocos-runbook.md §11](./cocos-runbook.md)。**恢复步骤：人工打开微信开发者工具 → 确认首启弹窗（游客模式/更新公告）→ 模拟器出现画面 → `node scripts/farm-sim-e2e.mjs`**。
+**已解决的 3 个独立阻塞**（详见 [cocos-runbook.md §11](./cocos-runbook.md)）：
+
+1. **IDE 版本回归**：原 RC 2.02.2607171 的 SummerCompiler 对小游戏必崩（`Object.keys(undefined)` 抛 `Cannot convert undefined or null to object`）。换装 **Stable 2.02.2608070**（2026-09-07，homebrew cask 当前版本，sha256 校验一致），旧 RC 备份在 `/tmp/wechatwebdevtools-rc-2.02.2607171-backup.app` 可回滚。
+2. **新基础库 3.17.x subcontext 适配**：裸 `Component` / `global` / `window` 不再注入 sandbox。修了 `OnlineFarm.ts` 漏 import Component（`assets/scripts/OnlineFarm.ts:21`）+ `scripts/patch-wechat-build.mjs` 脚本化 3 项构建后补丁（project.config、game.json、game.js 注入 `GameGlobal.global` + 遥测钩子）。
+3. **`game.json: networkTimeout 字段需为 object` 校验误报**：Cocos 默认产物 `downloadFile: 500000` 超出常规档位触发。已删除该字段（不承重，60s 默认足够），patch 脚本同步处理。
+
+**仍待解决（不阻塞主页 UI 实施）**：
+
+- **真机 G4**：需正式 AppID（已收到 `wx39a9fdbb628725fd`，但需上传审核后才能真机预览）+ 真机调试基线。
+- **模拟器 E2E 在 Stable 2608070 上 `miniprogram-automator` 协议对小游戏全面超时**（`checkVersion` 过、evaluate/screenshot 全超时；§11.6③）。E2E 退化为「启动 IDE + 人工点编译 + 看遥测/psql」。`scripts/farm-sim-telemetry.mjs` 在 `127.0.0.1:9877` 提供 HTTP console fallback 通道。
+- **G1.5 真实微信登录**：需要凭据，与上述阻塞独立。

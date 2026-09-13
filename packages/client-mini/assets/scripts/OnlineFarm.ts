@@ -18,7 +18,7 @@
  *   [OnlineFarm] 已连接服务端
  */
 
-import { Color, Label, Node, Vec3, view, _decorator } from 'cc';
+import { Color, Component, Label, Node, Vec3, view, _decorator } from 'cc';
 import {
   OnlineGameApp, EventBus, GameEvent,
   type OnlineState, type OnlinePlotView,
