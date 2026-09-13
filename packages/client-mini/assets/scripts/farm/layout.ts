@@ -42,10 +42,26 @@ export const MAP_SIZE = { w: DESIGN_WIDTH, h: DESIGN_HEIGHT };
 
 // ── Plot grid ────────────────────────────────────────────────────
 
-/** Display size of one plot block (design px). */
-export const PLOT_DISPLAY = 88;
-export const CROP_DISPLAY = 56;
-export const CROP_Y_LIFT = 10;
+/**
+ * Display size of one plot block (design px).
+ *
+ * M5-fix (2026-09-13): sprite 之前用 88×88，但格子 pitch 是 75×47（见 plot-layout.json
+ * `cell_size_720` + make-plot-layout.mjs §11.9）——88 比 75 大 13、88 比 47 大 41，相邻
+ * 地块互相覆盖，渲染出来是菱形拼贴，不是 6×4 网格。
+ *
+ * 地块 sprite 是 isometric 菱形（`plot_grass_empty.png` trim 后 226×151 ≈ 1.5:1），
+ * 目标视觉是 6×4 砖块式错位（每行 tile 顶部刚好压在上一行 tile 底部的阴影上）。设：
+ *   - PLOT_DISPLAY_W = 75 = pitchX（左右贴边、无缝）
+ *   - PLOT_DISPLAY_H = 50（保留 sprite 1.5:1 比例，不拉变形）
+ *   - pitchY = 47（小 3px）→ 下一行的菱形上顶压在上一行的菱形下底阴影上，砖块错位感
+ *
+ * `PLOT_DISPLAY` 单值保留为 `PLOT_DISPLAY_W` 同义（plotView 旧调用点），新代码用 W/H。
+ */
+export const PLOT_DISPLAY_W = 75;
+export const PLOT_DISPLAY_H = 50;
+export const PLOT_DISPLAY = PLOT_DISPLAY_W;
+export const CROP_DISPLAY = 42;
+export const CROP_Y_LIFT = 6;
 
 export interface PlotLayoutEntry {
   index: number;

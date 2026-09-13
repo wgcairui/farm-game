@@ -1,4 +1,4 @@
-# PostgreSQL + Redis for local dev and integration tests.
+# Local debug stack: PostgreSQL + Redis + nginx reverse proxy.
 #
 # Per ADR-0003 D30: G1 integration tests must run against a real PostgreSQL,
 # never against an in-memory stub. This compose file is the single source of
@@ -7,11 +7,20 @@
 # G2 T2 adds Redis for the Colyseus matchmaker directory + presence. Redis
 # is ephemeral by design — no volume, no business state.
 #
+# Nginx (M5-fix 2026-09-14): one-port front for the team to hit during debug.
+# /api/* → Fastify (host:3000), /ws → Colyseus (host:2567), / → static
+# wechatgame dir. The Fastify + Colyseus processes themselves run on host via
+# `pnpm dev` / `pnpm dev:ws` (we keep them out of the container so hot-reload
+# stays instant). nginx reaches them via `host.docker.internal` (Docker Desktop
+# adds it automatically when `extra_hosts: host.docker.internal:host-gateway`
+# is declared — switch to network_mode: host on Linux if you don't get that).
+#
 # Usage:
-#   pnpm --filter @farm-game/server db:up       # start postgres + redis (loopback only)
+#   pnpm --filter @farm-game/server db:up       # start postgres + redis + nginx (loopback only)
 #   pnpm --filter @farm-game/server db:down     # stop and remove the containers
-#   pnpm --filter @farm-game/server db:reset    # drop+create the volume
+#   pnpm --filter @farm-game/server db:reset    # drop+create the volume (postgres data gone)
 #   pnpm --filter @farm-game/server db:migrate  # apply SQL migrations
+#   curl -s http://127.0.0.1:8080/api/healthz   # smoke-test the stack via nginx
 
 name: farm-game-server
 
@@ -50,6 +59,41 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: farm-game-nginx
+    restart: unless-stopped
+    # Bind only to loopback so the team can debug locally without exposing
+    # the API/WS ports to the LAN (runbook §11.3 already covers wechatgame's
+    # own urlCheck issue; nginx is here for non-wechatgame consumers like curl
+    # scripts and the Colyseus SDK running in unit tests).
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Mount the Cocos-built wechatgame dir as the static root. Until the
+      # team runs `pnpm --filter @farm-game/client-mini build:cocos` + the
+      # patch script, this dir may be empty or stale — nginx will still
+      # answer /api/* and /ws fine.
+      - ../client-mini/build/wechatgame:/wechatgame:ro
+    # host.docker.internal is added to /etc/hosts by the Docker engine on
+    # macOS / Windows; on Linux without that magic, switch to
+    # `network_mode: host` and remove the upstream `host.docker.internal`
+    # hostnames (use 127.0.0.1 directly).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
 volumes:
   farm-pg-data:
