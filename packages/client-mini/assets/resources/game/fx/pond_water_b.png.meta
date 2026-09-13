@@ -31,10 +31,102 @@
         ".json"
       ],
       "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "54864d46-4030-4139-9d36-4de8a396d8ff@f9941",
+      "displayName": "pond_water_b",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": -0.5,
+        "offsetY": 0.5,
+        "trimX": 44,
+        "trimY": 55,
+        "width": 423,
+        "height": 401,
+        "rawWidth": 512,
+        "rawHeight": 512,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "54864d46-4030-4139-9d36-4de8a396d8ff@6c48a",
+        "atlasUuid": "",
+        "vertices": {
+          "rawPosition": [
+            -211.5,
+            -200.5,
+            0,
+            211.5,
+            -200.5,
+            0,
+            -211.5,
+            200.5,
+            0,
+            211.5,
+            200.5,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            44,
+            457,
+            467,
+            457,
+            44,
+            56,
+            467,
+            56
+          ],
+          "nuv": [
+            0.0859375,
+            0.109375,
+            0.912109375,
+            0.109375,
+            0.0859375,
+            0.892578125,
+            0.912109375,
+            0.892578125
+          ],
+          "minPos": [
+            -211.5,
+            -200.5,
+            0
+          ],
+          "maxPos": [
+            211.5,
+            200.5,
+            0
+          ]
+        }
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
     }
   },
   "userData": {
-    "type": "texture",
+    "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "54864d46-4030-4139-9d36-4de8a396d8ff@6c48a"

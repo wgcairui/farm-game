@@ -14,7 +14,7 @@ import { Node, Sprite } from 'cc';
 import { loadAll, type SpriteMap } from './assets';
 import {
   MAP_SIZE, PARALLAX_LAYERS, PROPS, SHOW_PARALLAX, SHOW_PROPS, SHOW_WATER,
-  WATER_CENTER, WATER_FRAME_MS, WATER_SIZE,
+  WATER_CENTER, WATER_FRAME_MS, WATER_SIZE, lawnRectCocos,
 } from './layout';
 import type { PlotLayout } from './layout';
 import { PlotView } from './plotView';
@@ -38,8 +38,9 @@ export class MapLayer {
     this.buildMapBase();
     if (SHOW_PROPS) this.buildPaths();
     if (SHOW_WATER) this.waterSprite = this.buildWater();
+    if (SHOW_PROPS) this.buildBackdropModules(layout); // far + mid: 在地块之下
     this.buildPlots(layout);
-    if (SHOW_PROPS) this.buildModules();
+    if (SHOW_PROPS) this.buildForegroundModules(layout); // near: 在地块之上
     this.fxLayer = sizedNode('FxLayer', 0, 0, root);
   }
 
@@ -89,16 +90,64 @@ export class MapLayer {
   private buildPlots(layout: PlotLayout): void {
     const grid = sizedNode('PlotGrid', 0, 0, this.root);
     for (let i = 0; i < layout.plots.length; i += 1) {
-      this.plotViews.push(new PlotView(grid, layout.plots[i], this.frames));
+      this.plotViews.push(new PlotView(grid, layout.plots[i], layout.cell_size_720, this.frames));
     }
   }
 
-  private buildModules(): void {
-    const layer = sizedNode('SceneModules', 0, 0, this.root);
+  private buildBackdropModules(layout: PlotLayout): void {
+    // M5-A: 远景 + 中景（far + mid），挂在 PlotGrid 之前 → 渲染在地块之下。
+    // dev-only: 对每个 prop 做 lawn-rect 碰撞检查，踩到就 throw。
+    const lawn = lawnRectCocos(layout);
+    const far = sizedNode('SceneModules_Far', 0, 0, this.root);
+    const mid = sizedNode('SceneModules_Mid', 0, 0, this.root);
     for (let i = 0; i < PROPS.length; i += 1) {
       const prop = PROPS[i];
-      const sprite = makeSprite(`Prop_${i}`, this.frames[prop.key] ?? null, prop.w, prop.w, layer);
+      if (prop.layer === 'near') continue;
+      this.assertOutsideLawn(prop, i, lawn);
+      const parent = prop.layer === 'far' ? far : mid;
+      const sprite = makeSprite(
+        `Prop_${i}_${prop.key.replace(/\//g, '_')}`,
+        this.frames[prop.key] ?? null,
+        prop.w, prop.w, parent,
+      );
       sprite.node.setPosition(prop.x, prop.y, 0);
+    }
+  }
+
+  private buildForegroundModules(layout: PlotLayout): void {
+    // M5-A: 近景（near），挂在 PlotGrid 之后 → 渲染在地块之上。
+    // 莲花叶/桥/装饰小石都属这一层。
+    const lawn = lawnRectCocos(layout);
+    const near = sizedNode('SceneModules_Near', 0, 0, this.root);
+    for (let i = 0; i < PROPS.length; i += 1) {
+      const prop = PROPS[i];
+      if (prop.layer !== 'near') continue;
+      this.assertOutsideLawn(prop, i, lawn);
+      const sprite = makeSprite(
+        `Prop_${i}_${prop.key.replace(/\//g, '_')}`,
+        this.frames[prop.key] ?? null,
+        prop.w, prop.w, near,
+      );
+      sprite.node.setPosition(prop.x, prop.y, 0);
+    }
+  }
+
+  private assertOutsideLawn(
+    prop: { key: string; x: number; y: number; w: number },
+    index: number,
+    lawn: { x: number; y: number; width: number; height: number },
+  ): void {
+    const half = prop.w / 2;
+    if (
+      prop.x + half > lawn.x &&
+      prop.x - half < lawn.x + lawn.width &&
+      prop.y + half > lawn.y &&
+      prop.y - half < lawn.y + lawn.height
+    ) {
+      throw new Error(
+        `PROPS[${index}] (${prop.key} @ (${prop.x},${prop.y}) w=${prop.w}) ` +
+        `overlaps lawn rect (${lawn.x},${lawn.y},${lawn.width},${lawn.height})`,
+      );
     }
   }
 

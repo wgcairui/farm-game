@@ -18,7 +18,7 @@
 import { Color, Label, Node, Sprite, SpriteFrame } from 'cc';
 import type { OnlinePlotView } from '../vendor/farm-online.js';
 import {
-  CROP_DISPLAY, CROP_Y_LIFT, HIT_SIZE, PLOT_DISPLAY, UNLOCK_PRICE_GOLD, plotCocosPosition,
+  CROP_DISPLAY, CROP_Y_LIFT, PLOT_DISPLAY, UNLOCK_PRICE_GOLD, plotCocosPosition,
 } from './layout';
 import type { PlotLayoutEntry } from './layout';
 import type { SpriteMap } from './assets';
@@ -45,7 +45,7 @@ export class PlotView {
   /** Wired by OnlineFarm — dispatches the semantic action for the CURRENT state. */
   onAction: ((plotIndex: number, action: PlotAction) => void) | null = null;
 
-  constructor(parent: Node, entry: PlotLayoutEntry, frames: SpriteMap) {
+  constructor(parent: Node, entry: PlotLayoutEntry, cell: [number, number], frames: SpriteMap) {
     this.frames = frames;
     this.layoutEntry = entry;
 
@@ -61,20 +61,34 @@ export class PlotView {
 
     this.lockIcon = makeSprite('Lock', this.f('icons/lock_sign'), 40, 40, this.node);
     this.lockIcon.node.setPosition(-14, 6, 0);
+    // M5-screenshot 2026-09-13: 默认隐藏 lock/price — node.active 不够（sprite renderer
+    // 仍会画 spriteFrame），需要 sprite.enabled = false 让 renderer 真正跳过。
+    this.lockIcon.enabled = false;
     this.priceLabel = makeLabel('Price', `${UNLOCK_PRICE_GOLD}`, 20, new Color(255, 232, 150, 255), this.node);
     this.priceLabel.node.setPosition(16, -2, 0);
+    this.priceLabel.node.active = false;
 
-    this.timeChip = sizedNode('TimeChip', 64, 26, this.node);
-    this.timeChip.setPosition(0, PLOT_DISPLAY / 2 + 16, 0);
-    roundRect(this.timeChip, 64, 26, 13, new Color(255, 252, 240, 225), new Color(120, 90, 40, 255), 2);
-    this.timeLabel = makeLabel('Time', '', 18, new Color(60, 40, 10, 255), this.timeChip);
+    // Countdown tag lives INSIDE the tile: the field is contiguous, so anything
+    // floating above a plot would sit on the row behind it. Sits high enough to
+    // clear the crop, and never shows together with the ripe badge.
+    this.timeChip = sizedNode('TimeChip', 46, 18, this.node);
+    this.timeChip.setPosition(0, 23, 0);
+    roundRect(this.timeChip, 46, 18, 9, new Color(255, 252, 240, 225), new Color(120, 90, 40, 255), 2);
+    this.timeLabel = makeLabel('Time', '', 15, new Color(60, 40, 10, 255), this.timeChip);
 
     this.badge = makeSprite('RipeBadge', this.f('icons/harvest_sparkle'), 34, 34, this.node);
     this.badge.node.setPosition(PLOT_DISPLAY / 2 - 8, PLOT_DISPLAY / 2 - 4, 0);
 
-    this.ring = selectionRing(HIT_SIZE, HIT_SIZE, this.node);
+    // Touch cell = the layout pitch, so neighbouring plots never overlap in the
+    // hit test (Cocos dispatches to the topmost node containing the point; an
+    // 85px box on a 47px pitch would let the front row steal the back row's
+    // taps). Nudged down to sit on the tile's visible box, which is offset from
+    // the sprite box centre by ~2px.
+    this.ring = selectionRing(cell[0] - 2, cell[1] + 4, this.node);
+    this.ring.setPosition(0, -2, 0);
 
-    const hit = sizedNode('Hit', HIT_SIZE, HIT_SIZE, this.node);
+    const hit = sizedNode('Hit', cell[0], cell[1], this.node);
+    hit.setPosition(0, -2, 0);
     hit.on(Node.EventType.TOUCH_START, () => {
       this.ring.active = true;
     });
@@ -148,6 +162,9 @@ export class PlotView {
   }
 
   private setVisible(lock: boolean, crop: boolean, time: boolean, badge: boolean): void {
+    // M5-screenshot 2026-09-13: lock/price 必须同时改 node.active + sprite.enabled，
+    // 单改 active 不能阻止 sprite renderer 画 spriteFrame。
+    this.lockIcon.enabled = lock;
     this.lockIcon.node.active = lock;
     this.priceLabel.node.active = lock;
     this.cropSprite.node.active = crop;

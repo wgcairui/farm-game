@@ -31,10 +31,102 @@
         ".json"
       ],
       "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "96c53015-2031-421c-8d4d-3385a9e8a882@f9941",
+      "displayName": "lotus_flower",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": -1,
+        "offsetY": 1,
+        "trimX": 3,
+        "trimY": 4,
+        "width": 318,
+        "height": 244,
+        "rawWidth": 326,
+        "rawHeight": 254,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "96c53015-2031-421c-8d4d-3385a9e8a882@6c48a",
+        "atlasUuid": "",
+        "vertices": {
+          "rawPosition": [
+            -159,
+            -122,
+            0,
+            159,
+            -122,
+            0,
+            -159,
+            122,
+            0,
+            159,
+            122,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            3,
+            250,
+            321,
+            250,
+            3,
+            6,
+            321,
+            6
+          ],
+          "nuv": [
+            0.009202453987730062,
+            0.023622047244094488,
+            0.9846625766871165,
+            0.023622047244094488,
+            0.009202453987730062,
+            0.984251968503937,
+            0.9846625766871165,
+            0.984251968503937
+          ],
+          "minPos": [
+            -159,
+            -122,
+            0
+          ],
+          "maxPos": [
+            159,
+            122,
+            0
+          ]
+        }
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
     }
   },
   "userData": {
-    "type": "texture",
+    "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "96c53015-2031-421c-8d4d-3385a9e8a882@6c48a"

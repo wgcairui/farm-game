@@ -27,13 +27,15 @@ export class Hud {
     const gold = makeSprite('GoldPanel', frames['ui/ui_panel_gold_bar'] ?? null, UI.goldPanel.w, UI.goldPanel.h, parent);
     applyWidget(gold.node, UI.goldPanel.widget);
     this.goldPanelNode = gold.node;
-    this.goldLabel = makeLabel('Gold', '0', 26, new Color(255, 236, 160, 255), gold.node);
-    this.goldLabel.node.setPosition(0, -12, 0);
+    // M5-screenshot 2026-09-13: 浅黄 label 在浅米色木牌背景上看不清，改为深棕；
+    // 把数字放大到 32、往下挪 8px 避开原 sprite 上方的星星徽章。
+    this.goldLabel = makeLabel('Gold', '0', 32, new Color(80, 50, 15, 255), gold.node);
+    this.goldLabel.node.setPosition(0, 6, 0);
 
     const cash = makeSprite('CashPanel', frames['ui/ui_panel_cash_bar'] ?? null, UI.cashPanel.w, UI.cashPanel.h, parent);
     applyWidget(cash.node, UI.cashPanel.widget);
-    this.cashLabel = makeLabel('Cash', '0', 22, new Color(160, 220, 255, 255), cash.node);
-    this.cashLabel.node.setPosition(0, -10, 0);
+    this.cashLabel = makeLabel('Cash', '0', 28, new Color(60, 80, 30, 255), cash.node);
+    this.cashLabel.node.setPosition(0, 6, 0);
 
     const avatarNode = sizedNode('Avatar', UI.avatar.r * 2, UI.avatar.r * 2, parent);
     applyWidget(avatarNode, UI.avatar.widget);

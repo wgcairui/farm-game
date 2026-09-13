@@ -31,10 +31,102 @@
         ".json"
       ],
       "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "9e81c639-ecc1-4b15-b98a-3b6f1dd152f3@f9941",
+      "displayName": "path_straight_stone",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": 0,
+        "offsetY": 0,
+        "trimX": 0,
+        "trimY": 0,
+        "width": 194,
+        "height": 316,
+        "rawWidth": 194,
+        "rawHeight": 316,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "9e81c639-ecc1-4b15-b98a-3b6f1dd152f3@6c48a",
+        "atlasUuid": "",
+        "vertices": {
+          "rawPosition": [
+            -97,
+            -158,
+            0,
+            97,
+            -158,
+            0,
+            -97,
+            158,
+            0,
+            97,
+            158,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            0,
+            316,
+            194,
+            316,
+            0,
+            0,
+            194,
+            0
+          ],
+          "nuv": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          "minPos": [
+            -97,
+            -158,
+            0
+          ],
+          "maxPos": [
+            97,
+            158,
+            0
+          ]
+        }
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
     }
   },
   "userData": {
-    "type": "texture",
+    "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "9e81c639-ecc1-4b15-b98a-3b6f1dd152f3@6c48a"

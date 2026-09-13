@@ -88,13 +88,13 @@ export class DialogLayer {
     this.open((panel, close) => {
       makeLabel('Title', '开垦新土地', 30, TEXT, panel).node.setPosition(0, 90, 0);
       makeLabel('Body', `花费 ${UNLOCK_PRICE_GOLD} 金币开垦这块土地？`, 24, TEXT, panel).node.setPosition(0, 20, 0);
-      const confirm = makeSprite('Confirm', this.frames['ui/ui_btn_confirm'] ?? null, 150, 60, panel);
-      confirm.node.setPosition(-90, -110, 0);
-      makeLabel('ConfirmText', '开垦', 24, TEXT, confirm.node);
-      const cancel = makeSprite('Cancel', null, 150, 60, panel);
-      roundRect(cancel.node, 150, 60, 28, ROW_FILL_DIM, ROW_STROKE, 3);
-      cancel.node.setPosition(90, -110, 0);
-      makeLabel('CancelText', '再想想', 24, TEXT_DIM, cancel.node);
+      // M5-D 2026-09-13: 「开垦」主按钮已经接 ui_btn_confirm (d5fcbbb)；
+      // 「再想想」次按钮升级为 ui_btn_close 圆角 × 按钮。
+      const confirm = makeSprite('Confirm', this.frames['ui/ui_btn_confirm'] ?? null, 180, 72, panel);
+      confirm.node.setPosition(-110, -110, 0);
+      makeLabel('ConfirmText', '开垦', 28, TEXT, confirm.node).node.setPosition(0, -4, 0);
+      const cancel = makeSprite('Cancel', this.frames['ui/ui_btn_close'] ?? null, 72, 72, panel);
+      cancel.node.setPosition(110, -110, 0);
       confirm.node.on(Node.EventType.TOUCH_END, () => close({ kind: 'confirm', plotIndex }));
       cancel.node.on(Node.EventType.TOUCH_END, () => close({ kind: 'close' }));
     });

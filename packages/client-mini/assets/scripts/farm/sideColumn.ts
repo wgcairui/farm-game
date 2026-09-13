@@ -1,8 +1,15 @@
 /**
- * sideColumn — right function column + left shortcuts (v24 §4–§5 ported, U11).
+ * sideColumn — right function column + left shortcuts (v24 §4–§5 ported, U11,
+ * M5-C 2026-09-13).
  *
- * Kit icons (batch H) on 88×88 independent hit nodes (≥44pt rule); every node
- * is edge-anchored via Widget so it survives Fit-Width shrink on phones.
+ * Kit icons (batch H / v13) on 88×88 independent hit nodes (≥44pt rule);
+ * every node is edge-anchored via Widget so it survives Fit-Width shrink on
+ * phones. Each button renders the kit sprite as its visible face — for the
+ * 4 left rail icons (分享/音乐/菜单/相机) the sprite is centered inside a
+ * roundRect frame so the icon "pops" against the wooden UI; the 3 right
+ * column icons (商城/萌宠/提篮) sit on a round-rect frame too (M5-C replaces
+ * the previous plain circle placeholder).
+ *
  * Buttons without a backing feature render grayed + toast 「未开放」.
  */
 
@@ -10,11 +17,15 @@ import { Color, Label, Node, Sprite } from 'cc';
 import type { SpriteMap } from './assets';
 import { UI, applyWidget } from './layout';
 import type { WidgetSpec } from './layout';
-import { makeLabel, makeSprite, sizedNode } from './widgets';
+import { makeLabel, makeSprite, roundRect, sizedNode } from './widgets';
 
 const GRAY = new Color(150, 150, 150, 255);
 const LABEL_COLOR = new Color(255, 250, 235, 255);
 const CLOCK_COLOR = new Color(90, 60, 20, 255);
+const FRAME_FILL = new Color(255, 248, 220, 220);
+const FRAME_STROKE = new Color(150, 110, 50, 255);
+const RAIL_FRAME_FILL = new Color(255, 245, 215, 200);
+const RAIL_FRAME_STROKE = new Color(120, 90, 40, 255);
 
 interface BtnSpec {
   readonly key: string;
@@ -31,14 +42,14 @@ export class SideColumn {
     onShop: () => void,
     onDisabled: (label: string) => void,
   ) {
-    // ── right column ──
-    const shop = this.iconButton(parent, frames, UI.sideBtns[0], { right: UI.sideRight, top: UI.sideBtns[0].top }, false);
+    // ── right column (M5-C: kitButton 替换 iconButton) ──
+    const shop = this.kitButton(parent, frames, UI.sideBtns[0], { right: UI.sideRight, top: UI.sideBtns[0].top }, false);
     shop.on(Node.EventType.TOUCH_END, () => onShop());
 
-    const pet = this.iconButton(parent, frames, UI.sideBtns[1], { right: UI.sideRight, top: UI.sideBtns[1].top }, true);
+    const pet = this.kitButton(parent, frames, UI.sideBtns[1], { right: UI.sideRight, top: UI.sideBtns[1].top }, true);
     pet.on(Node.EventType.TOUCH_END, () => onDisabled(UI.sideBtns[1].label));
 
-    const basket = this.iconButton(parent, frames, UI.sideBtns[2], { right: UI.sideRight, top: UI.sideBtns[2].top }, true);
+    const basket = this.kitButton(parent, frames, UI.sideBtns[2], { right: UI.sideRight, top: UI.sideBtns[2].top }, true);
     basket.on(Node.EventType.TOUCH_END, () => onDisabled(UI.sideBtns[2].label));
 
     // time capsule — real wall clock, refreshed by OnlineFarm every 30s
@@ -46,10 +57,10 @@ export class SideColumn {
     applyWidget(capsule, UI.timeCapsule.widget);
     this.clockLabel = makeLabel('Clock', '--:--', 22, CLOCK_COLOR, capsule);
 
-    // ── left rail ──
+    // ── left rail (M5-C: railButton 替换 iconButton 圆形占位) ──
     for (let i = 0; i < UI.leftBtns.length; i += 1) {
       const spec = UI.leftBtns[i];
-      const btn = this.iconButton(parent, frames, spec, { left: UI.sideRight, top: spec.top }, true);
+      const btn = this.railButton(parent, frames, spec, { left: UI.sideRight, top: spec.top });
       const label = spec.label;
       btn.on(Node.EventType.TOUCH_END, () => onDisabled(label));
     }
@@ -60,7 +71,8 @@ export class SideColumn {
     if (this.clockLabel) this.clockLabel.string = text;
   }
 
-  private iconButton(
+  /** M5-C: 右侧大按钮（商城/萌宠/提篮）— sprite + 圆角 frame 套。 */
+  private kitButton(
     parent: Node,
     frames: SpriteMap,
     spec: BtnSpec,
@@ -69,10 +81,30 @@ export class SideColumn {
   ): Node {
     const node = sizedNode(`Btn_${spec.label}`, UI.sideBtnSize, UI.sideBtnSize, parent);
     applyWidget(node, anchor);
-    const sprite = makeSprite('Icon', frames[spec.key] ?? null, UI.sideBtnSize - 12, UI.sideBtnSize - 12, node);
+    const frame = sizedNode('Frame', UI.sideBtnSize, UI.sideBtnSize, node);
+    roundRect(frame, UI.sideBtnSize - 4, UI.sideBtnSize - 4, 18, FRAME_FILL, FRAME_STROKE, 3);
+    const sprite = makeSprite('Icon', frames[spec.key] ?? null, UI.sideBtnSize - 20, UI.sideBtnSize - 20, frame);
     if (disabled && sprite.spriteFrame) sprite.color = GRAY;
     const tag = makeLabel('Tag', spec.label, 16, LABEL_COLOR, node);
-    tag.node.setPosition(0, -UI.sideBtnSize / 2 - 2, 0);
+    tag.node.setPosition(0, -UI.sideBtnSize / 2 - 4, 0);
+    return node;
+  }
+
+  /** M5-C: 左侧小按钮（分享/音乐/菜单/相机）— 60×60 sprite + 圆角方块 frame。 */
+  private railButton(
+    parent: Node,
+    frames: SpriteMap,
+    spec: BtnSpec,
+    anchor: WidgetSpec,
+  ): Node {
+    const node = sizedNode(`Rail_${spec.label}`, UI.sideBtnSize, UI.sideBtnSize, parent);
+    applyWidget(node, anchor);
+    const frame = sizedNode('Frame', UI.sideBtnSize, UI.sideBtnSize, node);
+    roundRect(frame, UI.sideBtnSize - 4, UI.sideBtnSize - 4, 16, RAIL_FRAME_FILL, RAIL_FRAME_STROKE, 2);
+    const iconSize = 60;
+    const sprite = makeSprite('Icon', frames[spec.key] ?? null, iconSize, iconSize, frame);
+    void sprite;
     return node;
   }
 }
+

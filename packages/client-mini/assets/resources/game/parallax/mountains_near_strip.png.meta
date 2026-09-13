@@ -31,10 +31,102 @@
         ".json"
       ],
       "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "0bc5d02f-f3f0-4e85-b3b0-bec12b5c8fe7@f9941",
+      "displayName": "mountains_near_strip",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": 0,
+        "offsetY": 0,
+        "trimX": 0,
+        "trimY": 0,
+        "width": 2880,
+        "height": 319,
+        "rawWidth": 2880,
+        "rawHeight": 319,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "0bc5d02f-f3f0-4e85-b3b0-bec12b5c8fe7@6c48a",
+        "atlasUuid": "",
+        "vertices": {
+          "rawPosition": [
+            -1440,
+            -159.5,
+            0,
+            1440,
+            -159.5,
+            0,
+            -1440,
+            159.5,
+            0,
+            1440,
+            159.5,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            0,
+            319,
+            2880,
+            319,
+            0,
+            0,
+            2880,
+            0
+          ],
+          "nuv": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          "minPos": [
+            -1440,
+            -159.5,
+            0
+          ],
+          "maxPos": [
+            1440,
+            159.5,
+            0
+          ]
+        }
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
     }
   },
   "userData": {
-    "type": "texture",
+    "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "0bc5d02f-f3f0-4e85-b3b0-bec12b5c8fe7@6c48a"

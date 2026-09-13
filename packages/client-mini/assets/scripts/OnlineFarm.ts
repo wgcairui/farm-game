@@ -24,7 +24,7 @@ import {
   type OnlineState, type OnlinePlotView,
 } from './vendor/farm-online.js';
 import {
-  SKY_COLOR, applyDesignResolution, applyWidget, loadPlotLayout,
+  SKY_COLOR, applyDesignResolution, applyWidget, lawnRectCocos, loadPlotLayout,
 } from './farm/layout';
 import { makeLabel, roundRect, sizedNode } from './farm/widgets';
 import { MapLayer } from './farm/mapLayer';
@@ -139,6 +139,8 @@ export class OnlineFarm extends Component {
 
   private async boot(): Promise<void> {
     const layout = await loadPlotLayout();
+    // eslint-disable-next-line no-console
+    console.log('[OnlineFarm] lawn rect cocos:', lawnRectCocos(layout).toString());
     this.mapLayer = await MapLayer.create(this.node, layout, (done, total) => {
       this.setStatus(`加载贴图 ${done}/${total}…`);
     });
@@ -153,7 +155,18 @@ export class OnlineFarm extends Component {
     this.sideColumn = new SideColumn(screenUi, frames, () => {
       this.dialogs?.showSeedPicker();
     }, (label) => this.toast?.show(`「${label}」未开放`));
-    this.bottomBar = new BottomBar(screenUi, frames);
+    this.bottomBar = new BottomBar(
+      screenUi,
+      frames,
+      (action) => {
+        // M5-B: 4 键彩色按钮路由。仓库/宠物/装扮 走 toast（功能未实现），商店
+        // 复用 sideColumn 的 seed picker（不是真商店，是选种子）。
+        if (action === '仓库') this.toast?.show('「仓库」未开放');
+        else if (action === '宠物') this.toast?.show('「宠物」未开放');
+        else if (action === '装扮') this.toast?.show('「装扮」未开放');
+      },
+      (action) => this.toast?.show(`「${action}」未开放`),
+    );
     this.toast = new ToastLayer(screenUi);
     this.dialogs = new DialogLayer(screenUi, frames);
     this.dialogs.onResult = (result) => this.onDialogResult(result);
@@ -365,9 +378,16 @@ export class OnlineFarm extends Component {
 
   private setStatus(text: string): void {
     if (this.statusLabel) this.statusLabel.string = text;
-    if (this.loadingCover && text.indexOf('已连接') >= 0) {
-      this.loadingCover.destroy();
-      this.loadingCover = null;
+    // M5-screenshot 2026-09-13: 之前 destroy 时机是「已连接服务端」— 但 devtools
+    // 模拟器对 127.0.0.1 域 wx.request 拦截 → app.start() 永远失败 → cover 永远
+    // 不销毁 → 24 块 + 场景道具 + UI 全被遮住（截图只能看到蓝屏）。改为「贴图
+    // 加载完」就销毁：boot 阶段就绪，视觉立刻可读，连接状态用 banner 单独表达。
+    if (this.loadingCover && text.startsWith('加载贴图')) {
+      const m = text.match(/(\d+)\/(\d+)/);
+      if (m && m[1] === m[2]) {
+        this.loadingCover.destroy();
+        this.loadingCover = null;
+      }
     }
     // eslint-disable-next-line no-console
     console.log(`[OnlineFarm] ${text}`);

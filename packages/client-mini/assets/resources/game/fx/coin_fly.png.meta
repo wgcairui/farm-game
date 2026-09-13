@@ -31,10 +31,102 @@
         ".json"
       ],
       "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "d263721f-fba4-489d-be94-53c96f518335@f9941",
+      "displayName": "coin_fly",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": 93.5,
+        "offsetY": 35.5,
+        "trimX": 187,
+        "trimY": 117,
+        "width": 325,
+        "height": 207,
+        "rawWidth": 512,
+        "rawHeight": 512,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "d263721f-fba4-489d-be94-53c96f518335@6c48a",
+        "atlasUuid": "",
+        "vertices": {
+          "rawPosition": [
+            -162.5,
+            -103.5,
+            0,
+            162.5,
+            -103.5,
+            0,
+            -162.5,
+            103.5,
+            0,
+            162.5,
+            103.5,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            187,
+            395,
+            512,
+            395,
+            187,
+            188,
+            512,
+            188
+          ],
+          "nuv": [
+            0.365234375,
+            0.3671875,
+            1,
+            0.3671875,
+            0.365234375,
+            0.771484375,
+            1,
+            0.771484375
+          ],
+          "minPos": [
+            -162.5,
+            -103.5,
+            0
+          ],
+          "maxPos": [
+            162.5,
+            103.5,
+            0
+          ]
+        }
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
     }
   },
   "userData": {
-    "type": "texture",
+    "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "d263721f-fba4-489d-be94-53c96f518335@6c48a"

@@ -31,10 +31,102 @@
         ".json"
       ],
       "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "b2f9d3bd-2901-4ab6-ba48-ed15fa0a3bb8@f9941",
+      "displayName": "forest_belt_strip",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimType": "auto",
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": 0,
+        "offsetY": 0,
+        "trimX": 0,
+        "trimY": 0,
+        "width": 2880,
+        "height": 344,
+        "rawWidth": 2880,
+        "rawHeight": 344,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "b2f9d3bd-2901-4ab6-ba48-ed15fa0a3bb8@6c48a",
+        "atlasUuid": "",
+        "vertices": {
+          "rawPosition": [
+            -1440,
+            -172,
+            0,
+            1440,
+            -172,
+            0,
+            -1440,
+            172,
+            0,
+            1440,
+            172,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            0,
+            344,
+            2880,
+            344,
+            0,
+            0,
+            2880,
+            0
+          ],
+          "nuv": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          "minPos": [
+            -1440,
+            -172,
+            0
+          ],
+          "maxPos": [
+            1440,
+            172,
+            0
+          ]
+        }
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
     }
   },
   "userData": {
-    "type": "texture",
+    "type": "sprite-frame",
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "b2f9d3bd-2901-4ab6-ba48-ed15fa0a3bb8@6c48a"
