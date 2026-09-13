@@ -119,6 +119,13 @@ export class OnlineFarm extends Component {
     this.schedule(() => this.tickOneSecond(), 1);
     this.schedule(() => this.sideColumn?.setClock(this.wallClock()), 30);
     this.sideColumn?.setClock(this.wallClock());
+
+    // M5-fix (2026-09-13): WS push 在 devtools 模拟器下偶尔拿不到（timeout /
+    // Redis race），仅靠 WS 永远收不到服务端状态变更。暴露一个 HTTP 兜底刷新
+    // 让 driver / E2E 在 WS 断的时候也能拿到最新 player。trigger：bridge
+    // __farm.refreshFromHttp()（§M5）。
+    (globalThis as { __farm?: FarmGlobal & { refreshFromHttp?: () => Promise<void> } }).__farm!.refreshFromHttp =
+      async (): Promise<void> => { await this.refreshFromHttp(); };
   }
 
   update(dt: number): void {
@@ -340,6 +347,25 @@ export class OnlineFarm extends Component {
     if (!plot) return;
     const serverNow = Date.now() + (s?.serverNowOffsetMs ?? 0);
     this.mapLayer?.plotViews[index]?.refreshView(plot, serverNow);
+  }
+
+  /** M5-fix (2026-09-13): HTTP 兜底刷新 — WS 拿不到时从 /player/info 重拉玩家，
+   *  走 applyWelcome 让 OnlineFarm 重新 emit CoinsChanged / PlotStateChanged。
+   *  上线场景不需要，devtools 模拟器专用。 */
+  private async refreshFromHttp(): Promise<void> {
+    if (this.app === null) return;
+    try {
+      const fresh = await this.app.http.getPlayerInfo();
+      this.app.applyWelcome({
+        serverNow: Date.now(),
+        roomId: 'http-refresh',
+        player: fresh,
+      });
+      this.refreshAll();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[OnlineFarm] refreshFromHttp failed', err);
+    }
   }
 
   /** 1s tick — countdown labels + stage flips are time-driven. */
