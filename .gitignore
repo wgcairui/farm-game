@@ -86,3 +86,7 @@ android/app/build/
 .drizzle/
 # Node 诊断报告（--report-signal 产物）
 report.*.json
+
+# 临时 probe 脚本（不入库；保留 farm-sim-probe.mjs 作为合法探针）
+scripts/farm-automator-*-probe*.mjs
+scripts/farm-probe[0-9]*.mjs
