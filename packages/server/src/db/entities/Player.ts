@@ -8,6 +8,11 @@
  *
  * Identity bindings live in a separate table (see AuthIdentity) so the public
  * `PlayerSave` envelope can list identity summaries without leaking subjects.
+ *
+ * Stage D (ADR-0006 admin ops): `bannedAt` is set by
+ * `/admin-ops/players/:playerId/ban` via `withAdminAudit` so the business
+ * mutation + admin_audit_log row commit in one transaction (D49). NULL
+ * means active; v2 has no unban route.
  */
 
 import { defineEntity } from '@mikro-orm/core';
@@ -24,6 +29,8 @@ export class Player {
   sfxVolume!: number;
   notificationsEnabled!: boolean;
   revision!: number;
+  /** Stage D: timestamp of admin ban; NULL means active. */
+  bannedAt!: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 }
@@ -44,6 +51,7 @@ export const PlayerEntity = defineEntity({
     sfxVolume: p.double().default(1.0),
     notificationsEnabled: p.boolean().default(true),
     revision: p.type('integer').default(0),
+    bannedAt: p.datetime().nullable(),
     createdAt: p.datetime().defaultRaw('now()'),
     updatedAt: p.datetime().defaultRaw('now()'),
   }),

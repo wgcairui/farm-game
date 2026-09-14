@@ -40,6 +40,8 @@ import { makeMikroOrmTransactionRunner } from './repositories/transaction.js';
 import { isVerifiedAuth, type VerifiedAuth } from './auth/jwt.js';
 import { isVerifiedAdminAuth, type VerifiedAdminAuth } from './admin/auth.js';
 import { mountAdmin } from './admin/index.js';
+import type { AdminRepo } from './repositories/admin-repo.js';
+import type { RoomLeaseRepo } from './repositories/room-lease-repo.js';
 import type { ServerConfig } from './config.js';
 import { logger } from './obs/logger.js';
 
@@ -56,6 +58,15 @@ export interface BuildAppOptions {
    * is constructed from the same ORM by the caller; `app` does not own it.
    */
   orm?: MikroORM;
+  /**
+   * Stage D: admin sub-module deps. Required when `config.enableAdmin`
+   * is true. Omitted otherwise (and the test suite continues to work
+   * because the admin-disabled branch of `mountAdmin` needs none of
+   * these).
+   */
+  adminRepo?: AdminRepo;
+  leases?: RoomLeaseRepo;
+  publishDrain?: (instanceId: string) => Promise<void>;
 }
 
 declare module 'fastify' {
@@ -80,7 +91,7 @@ export interface AdminJwtPayload {
 }
 
 export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> {
-  const { config, repo = new InMemoryPlayerRepo(), orm } = opts;
+  const { config, repo = new InMemoryPlayerRepo(), orm, adminRepo, leases, publishDrain } = opts;
 
   const app = Fastify({
     // pino v10's `Logger<never, boolean>` generic doesn't structurally match
@@ -271,9 +282,13 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   await mountAdmin(
     app,
     {
+      // legacy fields kept for backwards compat with the Stage A call
+      // signature; both are ignored at runtime per ADR-0006 D44.
       adminDbUrl: config.adminDbUrl ?? '',
-      jwtSecretAdmin: config.jwtSecretAdmin,
       sessionSecret: config.sessionSecret,
+      // Stage D: when ENABLE_ADMIN=1 these are required; absent deps
+      // cause mountAdmin to throw AdminConfigError (fail closed).
+      config, orm, adminRepo, leases, publishDrain,
     },
     config.enableAdmin,
   );
