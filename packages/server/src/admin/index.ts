@@ -9,12 +9,16 @@
  *
  * 旧的"双 ORM 物理隔离"五条规则**作废**。新边界规则：
  *   - 业务代码（`auth|crop|player|farm|realtime/**`）禁止 import `drizzle-orm` /
- *     `@colyseus/database` / `@colyseus/admin`（计划从 `package.json` 移除）
+ *     `@colyseus/database` / `@colyseus/admin`（已从 `package.json` 移除）
  *   - Admin 代码（`packages/server/src/admin/**`）允许 import `@mikro-orm/core`
  *     （admin 也用同一份 MikroORM，只是 entities 放 `admin` schema）
  *
- * Phase 1 状态：当前 `mountAdmin()` 在 `ENABLE_ADMIN=0` 时挂 `/admin/healthz` 返 `{enabled:false}`；
- * `ENABLE_ADMIN=1` 时抛 `AdminConfigError`（admin 子模块 v2 待实装，见 admin-integration.md §4 迁移顺序）。
+ * 文件说明：本目录当前仅 `index.ts` 一个文件；v1 占位（db.config / panel / schema）已于
+ * 阶段 A 直接删除，git blame 可追溯决策演变。后续阶段（B 起）会按需新增
+ * `ops-routes.ts` / `auth-prehandler.ts` / `audit.ts` / `rate-limit.ts`。
+ *
+ * 当前阶段（`ENABLE_ADMIN=0`）：挂 `/admin/healthz` 返 `{enabled:false}`，admin 子模块不初始化。
+ * `ENABLE_ADMIN=1`：抛 `AdminConfigError`（admin 子模块 v2 待实装，见 admin-integration.md §4 迁移顺序）。
  */
 
 import type { FastifyInstance } from 'fastify';
