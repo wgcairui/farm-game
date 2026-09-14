@@ -8,6 +8,16 @@
  *  - A pre-handler `authenticate` decorator centralises the verify+exp-error mapping.
  *  - A preParsing hook rejects mismatched `x-protocol-version` with HTTP 426.
  *  - The default host is 127.0.0.1 (see `loadConfig`); binding to 0.0.0.0 logs a warning.
+ *
+ * Per ADR-0006 D46/D50:
+ *  - A SECOND @fastify/jwt instance is registered under namespace `admin`
+ *    with `jwtSecretAdmin` and its own short TTL (default 2h, range 1-4h).
+ *    A business token cannot satisfy the admin namespace's `jwtVerify()`
+ *    because the secrets differ and `iss`/`aud` also overlap on purpose
+ *    (so a stolen business JWT cannot be replayed as admin).
+ *  - `app.authenticateAdmin` mirrors the business `authenticate` decorator
+ *    and returns the `{sub: adminUserId, role}` payload as the verified user.
+ *    Stage D's `/admin-ops/*` routes chain this decorator for all writes.
  */
 
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
@@ -28,6 +38,7 @@ import type { PlayerRepo } from './repositories/player-repo.js';
 import { MikroORMPlayerRepo } from './repositories/MikroORMPlayerRepo.js';
 import { makeMikroOrmTransactionRunner } from './repositories/transaction.js';
 import { isVerifiedAuth, type VerifiedAuth } from './auth/jwt.js';
+import { isVerifiedAdminAuth, type VerifiedAdminAuth } from './admin/auth.js';
 import { mountAdmin } from './admin/index.js';
 import type { ServerConfig } from './config.js';
 import { logger } from './obs/logger.js';
@@ -51,6 +62,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     config: ServerConfig;
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    authenticateAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -59,6 +71,12 @@ declare module '@fastify/jwt' {
     payload: { identities: import('@farm-game/shared').AuthIdentityRef[] };
     user: VerifiedAuth;
   }
+}
+
+/** Payload shape for admin namespace tokens. */
+export interface AdminJwtPayload {
+  sub: string;       // admin user id (numeric string from BIGSERIAL)
+  role: string;
 }
 
 export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> {
@@ -151,6 +169,27 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     verify: { allowedIss: config.jwtIssuer, allowedAud: config.jwtAudience },
   });
 
+  // 2a. Admin JWT namespace — second @fastify/jwt registration with its
+  //     own secret and TTL. `namespace: 'admin'` produces:
+  //       - `app.jwt.admin.sign(payload)` / `.verify(token)` (server-side)
+  //       - `req.adminJwtVerify()` request-side helper
+  //       - `req.adminUser` holds the decoded payload after verify
+  //     Setting `decoratorName: 'adminUser'` is critical so the verified
+  //     payload does NOT collide with `req.user` (the business namespace's
+  //     default), which would let a leaked business token shadow admin
+  //     state if both verified on the same request.
+  await app.register(fastifyJwt, {
+    secret: config.jwtSecretAdmin,
+    namespace: 'admin',
+    decoratorName: 'adminUser',
+    sign: {
+      iss: config.jwtIssuer,
+      aud: config.jwtAudience,
+      expiresIn: config.jwtTtlSecAdmin,
+    },
+    verify: { allowedIss: config.jwtIssuer, allowedAud: config.jwtAudience },
+  });
+
   // 3. Authenticate decorator — maps FAST_JWT_EXPIRED → 1102 TOKEN_EXPIRED,
   //    other verify failures → 1101 INVALID_TOKEN. Returns a sentinel after
   //    sending the reply so Fastify does not double-send or run the handler.
@@ -172,6 +211,41 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
         ok: false,
         code: ErrorCode.INVALID_TOKEN,
         message: 'token missing sub/identities',
+      } satisfies ApiResponse<never>);
+      return reply;
+    }
+    return undefined;
+  });
+
+  // 3a. AuthenticateAdmin decorator — same error mapping as `authenticate`
+  //     but verifies against the `admin` JWT namespace. A token signed with
+  //     `jwtSecret` (business) will fail here because the namespaces use
+  //     different secrets, so a stolen business JWT cannot be replayed
+  //     against `/admin-ops/*` (ADR-0006 D46).
+  app.decorate('authenticateAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      // @fastify/jwt v10 namespaced registration exposes the verify helper
+      // as `req.<namespace>JwtVerify()` — not `req.jwtVerify({ namespace })`
+      // which does not exist. After verify, the decoded payload lands on
+      // `req.adminUser` (because we set decoratorName: 'adminUser' above).
+      const reqAny = req as unknown as { adminJwtVerify: () => Promise<void>; adminUser?: unknown };
+      await reqAny.adminJwtVerify();
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      reply.code(401);
+      const payload: ApiResponse<never> = code === 'FST_JWT_AUTHORIZATION_TOKEN_EXPIRED'
+        ? { ok: false, code: ErrorCode.TOKEN_EXPIRED, message: 'admin token expired' }
+        : { ok: false, code: ErrorCode.NOT_AUTHENTICATED, message: 'invalid admin token' };
+      reply.send(payload);
+      return reply;
+    }
+    const adminUser = (req as unknown as { adminUser?: unknown }).adminUser;
+    if (!isVerifiedAdminAuth(adminUser)) {
+      reply.code(401);
+      reply.send({
+        ok: false,
+        code: ErrorCode.NOT_AUTHENTICATED,
+        message: 'admin token missing sub/role',
       } satisfies ApiResponse<never>);
       return reply;
     }
