@@ -70,6 +70,14 @@ const UI_KEYS = [
   'ui/ui_btn_tabbar_orange',
   'ui/ui_btn_tabbar_blue',
   'ui/ui_btn_tabbar_green',
+  // M7 2026-09-14: 侧栏 7 按钮（每按钮独立配色，避免跟 tabbar 4 色撞色）
+  'ui/ui_btn_side_share',
+  'ui/ui_btn_side_music',
+  'ui/ui_btn_side_menu',
+  'ui/ui_btn_side_camera',
+  'ui/ui_btn_side_shop',
+  'ui/ui_btn_side_pet',
+  'ui/ui_btn_side_basket',
 ];
 
 const MODULE_KEYS = [

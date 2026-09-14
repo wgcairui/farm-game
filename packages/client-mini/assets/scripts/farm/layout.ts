@@ -200,21 +200,26 @@ export const UI = {
   connDot: { r: 10, widget: { right: 28, top: 20 } },
   disconnectBanner: { w: 720, h: 64, y: 468 },
 
-  // Right column — kit icons; basket falls back to seed_bag (§7 缺口降级)
+  // M7 2026-09-14: 侧栏按钮 = 独立 button sprite + 独立 icon sprite（去掉程序化 roundRect）
+  // 右栏 3 按钮（商城/萌宠/提篮）— 88×88 hit area；iconSize 72 居中；label 在按钮下方
+  // 左栏 4 按钮（分享/音乐/菜单/相机）— 88×88 hit area；iconSize 60 居中；无 label
   sideRight: 20,
   sideBtnSize: 88,
+  sideBtnIconSize: 72,
+  sideBtnLabelGap: 4,
   sideBtns: [
-    { key: 'ui/ui_icon_shop', top: 296, label: '商城', enabled: true },
-    { key: 'ui/ui_icon_pet', top: 406, label: '萌宠', enabled: false },
-    { key: 'icons/seed_bag', top: 516, label: '提篮', enabled: false },
+    { btnKey: 'ui/ui_btn_side_shop',   iconKey: 'ui/ui_icon_shop', top: 296, label: '商城', enabled: true  },
+    { btnKey: 'ui/ui_btn_side_pet',    iconKey: 'ui/ui_icon_pet',  top: 406, label: '萌宠', enabled: false },
+    { btnKey: 'ui/ui_btn_side_basket', iconKey: 'icons/seed_bag', top: 516, label: '提篮', enabled: false },
   ],
   timeCapsule: { w: 128, h: 44, widget: { right: 24, top: 614 } },
 
+  leftBtnIconSize: 60,
   leftBtns: [
-    { key: 'ui/ui_icon_share', top: 176, label: '分享' },
-    { key: 'ui/ui_icon_music', top: 271, label: '音乐' },
-    { key: 'ui/ui_icon_menu', top: 366, label: '菜单' },
-    { key: 'ui/ui_icon_camera', top: 461, label: '相机' },
+    { btnKey: 'ui/ui_btn_side_share',  iconKey: 'ui/ui_icon_share',  top: 176, label: '分享' },
+    { btnKey: 'ui/ui_btn_side_music',  iconKey: 'ui/ui_icon_music',  top: 271, label: '音乐' },
+    { btnKey: 'ui/ui_btn_side_menu',   iconKey: 'ui/ui_icon_menu',   top: 366, label: '菜单' },
+    { btnKey: 'ui/ui_btn_side_camera', iconKey: 'ui/ui_icon_camera', top: 461, label: '相机' },
   ],
 
   taskBar: { w: 340, h: 64, widget: { left: 20, bottom: 96 } },
