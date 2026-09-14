@@ -197,6 +197,34 @@ export class RoomLeaseRepo {
     }
   }
 
+  /**
+   * Stage D: admin force-release. Expires the lease row for the given
+   * owner regardless of which (roomId, instanceId, epoch) currently
+   * holds it. Returns true if a live lease was actually expired; false
+   * if no live lease existed for this owner. The next takeover by
+   * another WS instance will increment `epoch` per the existing
+   * constraint.
+   *
+   * Distinct from `release(lease)` (which requires a known lease and is
+   * the WS path's own decision to abandon). Admin force-release
+   * deliberately does NOT check `epoch` because the admin's job is to
+   * take over no matter what state the row is in.
+   */
+  async forceRelease(ownerId: string): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const res = await client.query(
+        `UPDATE farm_room_leases
+         SET expires_at = now(), updated_at = now()
+         WHERE owner_id = $1 AND expires_at > now()`,
+        [ownerId],
+      );
+      return (res.rowCount ?? 0) > 0;
+    } finally {
+      client.release();
+    }
+  }
+
   /** The live lease for an owner, or null when none is unexpired. */
   async findCurrent(ownerId: string): Promise<RoomLease | null> {
     const client = await this.pool.connect();
