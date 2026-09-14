@@ -35,6 +35,11 @@ const ICON_KEYS = [
   'icons/star_gold',
   'icons/water_drop',
   'icons/watering_can',
+  // M6 2026-09-14: iOS-style nav icons (仓库 / 商店 / 宠物 / 装扮)
+  'icons/ui_icon_crate',
+  'icons/ui_icon_market',
+  'icons/ui_icon_paw',
+  'icons/ui_icon_palette',
 ];
 
 const FX_KEYS = [
@@ -60,6 +65,11 @@ const UI_KEYS = [
   'ui/ui_panel_gold_bar',
   'ui/ui_panel_cash_bar',
   'ui/ui_popup_panel',
+  // M6 2026-09-14: 4-colour iOS tabbar buttons (红/橙/蓝/绿)
+  'ui/ui_btn_tabbar_red',
+  'ui/ui_btn_tabbar_orange',
+  'ui/ui_btn_tabbar_blue',
+  'ui/ui_btn_tabbar_green',
 ];
 
 const MODULE_KEYS = [

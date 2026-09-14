@@ -224,6 +224,22 @@ export const UI = {
   // M5-B 2026-09-13: 5 键占位（首页/仓库/种子/好友/更多）→ 4 键彩色按钮（仓库/商店/宠物/装扮）
   navXs: [-260, -90, 90, 260],
   navLabels: ['仓库', '商店', '宠物', '装扮'],
+  // M6 2026-09-14: 4-colour iOS tabbar buttons (red/orange/blue/green)
+  navBtnKeys: [
+    'ui/ui_btn_tabbar_red',
+    'ui/ui_btn_tabbar_orange',
+    'ui/ui_btn_tabbar_blue',
+    'ui/ui_btn_tabbar_green',
+  ] as const,
+  // M6 2026-09-14: 4 nav icons (warehouse/market/paw/palette) — 64×64 centered
+  navIconKeys: [
+    'icons/ui_icon_crate',
+    'icons/ui_icon_market',
+    'icons/ui_icon_paw',
+    'icons/ui_icon_palette',
+  ] as const,
+  navIconSize: 64,
+  navIconLiftY: 4,
 
   toastX: 0,
   toastTopY: 400,
