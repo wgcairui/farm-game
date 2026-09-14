@@ -18,7 +18,7 @@
 
 **Redis 端口注意**：compose.yml 用 `:6380` 而非 `:6379`，避让本机已有 Redis。改 compose 必须确认不冲突。
 
-**Admin 现状**：`src/admin/index.ts` 是 v2 占位骨架。**v2 路径（2026-09-14 决策）**：放弃 `@colyseus/admin` + `@colyseus/database` + Drizzle + 第二个 DB，改用 Refine standalone + 我们自己的 Fastify `/admin-ops/*` 路由 + MikroORM `admin` schema（同一 DB）。依赖 `@colyseus/admin` / `@colyseus/database` / `@colyseus/auth` 计划从 `package.json` 移除；移除前 ESList `no-restricted-imports` 兜底。详见 [`docs/admin-integration.md`](../../docs/admin-integration.md) v2。
+**Admin 现状**：`src/admin/index.ts` 是 v2 占位骨架（`ENABLE_ADMIN=0` no-op / `=1` 抛 `AdminConfigError`）；v1 三个占位文件 `db.config.ts` / `panel.ts` / `schema.ts` 已于阶段 A 直接删除（不留 `@deprecated`）。**v2 路径（2026-09-14 决策）**：放弃 `@colyseus/admin` + `@colyseus/database` + Drizzle + 第二个 DB，改用 Refine standalone + 我们自己的 Fastify `/admin-ops/*` 路由 + MikroORM `admin` schema（同一 DB）。依赖 `@colyseus/admin` / `@colyseus/database` / `@colyseus/auth` 已从 `package.json` 移除；后续阶段会引入 ESLint `no-restricted-imports` 兜底（ADR-0006 D48）。详见 [`docs/admin-integration.md`](../../docs/admin-integration.md) v2。
 
 ---
 
@@ -44,7 +44,7 @@ src/
 ├── services/           # 业务服务层（解锁 / 种植 / 浇水 / 收获）
 ├── db/
 │   └── migrate.ts      # MikroORM migrations runner
-├── admin/              # v2 占位：ENABLE_ADMIN=0 时返 no-op；=1 时抛 AdminConfigError（v2 路径：Refine + /admin-ops/* 路由 + MikroORM admin schema；详见 docs/admin-integration.md）
+├── admin/              # v2 单文件占位（index.ts）：ENABLE_ADMIN=0 返 no-op；=1 抛 AdminConfigError；v1 占位 db.config/panel/schema 已删（阶段 A）
 └── obs/                # pino / 指标
 test/
 ├── integration/        # 真实 PG：G1 9 + farm-room 12 + failover 3 + lease 10
@@ -138,7 +138,7 @@ node --import tsx scripts/seed-admin.ts       # Phase 3 admin seed
 |---|---|
 | `MAIN_DB_URL` | **唯一**业务库（默认 `postgres://farm:farm@127.0.0.1:5432/farm_game`）|
 | `TEST_DB_URL` | 集成测试库（compose/db-init 创建）|
-| `ADMIN_DB_URL` | 当前**未使用**（admin 占位保留，将来真做面板再建独立 DB）|
+| `ADMIN_DB_URL` | **已废弃**（admin v2 走同库 `admin` schema，不再有第二个 DB；即便设了也会被忽略，见 [ADR-0006 §6](./../../docs/adr/0006-admin-v2-refine-mikroorm.md)）|
 | `REDIS_URL` | 默认 `redis://127.0.0.1:6380` |
 | `WS_HOST` / `WS_PORT` | WS 进程监听（`server.listen` 绑点）|
 | `PUBLIC_WS_HOST` / `PUBLIC_WS_PORT` | LB-fronted 部署时设（ADR-0005 D42）。matchmake 响应里返回的端点；让 SDK 客户端连 LB 公网域名而非内网。`PUBLIC_WS_PORT` 必须正整数；不设 → 退回 `wsHost:wsPort` |

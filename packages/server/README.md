@@ -160,7 +160,7 @@ src/
 ├── repositories/       # PlayerRepo + RoomLeaseRepo + tx runner
 ├── services/           # business logic (services/farm/*)
 ├── db/                 # MikroORM config, migrations, entities
-├── admin/              # admin ops boundary (v2: Refine + /admin-ops/* routes + MikroORM admin schema)
+├── admin/              # v2 single-file boundary (Refine + /admin-ops/* routes + MikroORM admin schema; v1 placeholders deleted)
 └── obs/                # pino logger
 ```
 

@@ -83,7 +83,7 @@ v1 计划把 `@colyseus/admin` 接进来作为后台面板，因为它"开箱即
 
 Phase 3 起执行：
 
-1. **依赖精简**：从 `packages/server/package.json` 移除 `@colyseus/admin` / `@colyseus/database` / `@colyseus/auth`（`@colyseus/core` / `redis-driver` / `redis-presence` / `ws-transport` 保留，这些是 WS 框架本身）
+1. **依赖精简 + 占位文件直接删除**：从 `packages/server/package.json` 移除 `@colyseus/admin` / `@colyseus/database` / `@colyseus/auth`（`@colyseus/core` / `redis-driver` / `redis-presence` / `ws-transport` 保留，这些是 WS 框架本身）；**同时 `rm` 三个 v1 占位文件** `src/admin/{db.config,schema,panel}.ts`（不复用、不留 `@deprecated`，git blame 可追溯）
 2. **schema 创建**：单一 migration 增加 `CREATE SCHEMA IF NOT EXISTS admin;`
 3. **MikroORM entities**：在 `src/db/entities/admin/` 下新建 `AdminUser.ts` / `AdminAuditLog.ts`（可选 `AdminSession.ts`）
 4. **AdminRepo**：`src/repositories/admin-repo.ts` 30-50 行，跟 `PlayerRepo` 一个套路
@@ -120,9 +120,9 @@ Phase 3 起执行：
 | 文件 | 状态 | 计划 |
 |---|---|---|
 | `packages/server/src/admin/index.ts` | 占位（`ENABLE_ADMIN=0` no-op / `=1` 抛错） | v2 重写挂挂载 ops-routes |
-| `packages/server/src/admin/db.config.ts` | 占位 | v2 删除（用 MikroORM 主连接） |
-| `packages/server/src/admin/schema.ts` | 仅字符串常量 | v2 删除（用 MikroORM entities） |
-| `packages/server/src/admin/panel.ts` | 占位抛错 | v2 删除（前端用独立 web 包） |
+| ~~`packages/server/src/admin/db.config.ts`~~ | **v2 删除（阶段 A）** | — |
+| ~~`packages/server/src/admin/schema.ts`~~ | **v2 删除（阶段 A）** | — |
+| ~~`packages/server/src/admin/panel.ts`~~ | **v2 删除（阶段 A）** | — |
 | `packages/server/src/admin/ops-routes.ts` | 不存在 | v2 新建：6-8 个路由 |
 | `packages/server/src/admin/auth-prehandler.ts` | 不存在 | v2 新建：`authenticateAdmin` 装饰器 |
 | `packages/server/src/db/entities/admin/AdminUser.ts` | 不存在 | v2 新建 |
