@@ -160,7 +160,7 @@ src/
 ├── repositories/       # PlayerRepo + RoomLeaseRepo + tx runner
 ├── services/           # business logic (services/farm/*)
 ├── db/                 # MikroORM config, migrations, entities
-├── admin/              # @colyseus/admin boundary (placeholder)
+├── admin/              # admin ops boundary (v2: Refine + /admin-ops/* routes + MikroORM admin schema)
 └── obs/                # pino logger
 ```
 

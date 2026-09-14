@@ -12,13 +12,13 @@
 |---|---|---|---|
 | API (Fastify HTTP) | `pnpm dev` | `127.0.0.1:3000` | PM2 fork（instances = cpus）|
 | WS (Colyseus) | `pnpm dev:ws` | `127.0.0.1:2567` | 独立进程，共享 PostgreSQL |
-| Admin (`@colyseus/admin`) | **当前未启用** | — | `ENABLE_ADMIN=0` 默认关闭；`ENABLE_ADMIN=1` 即抛 `AdminConfigError` |
+| Admin (v2) | **当前未启用** | — | `ENABLE_ADMIN=0` 默认关闭；`ENABLE_ADMIN=1` 时 `mountAdmin()` 抛 `AdminConfigError`（v2 待实装，详见 [`docs/admin-integration.md`](../../docs/admin-integration.md)） |
 | PostgreSQL | `pnpm db:up` | `127.0.0.1:5432`（**避让本机其他项目**：compose.yml 显式映射）| docker compose |
 | Redis | 同上 | `127.0.0.1:6380`（避让本机 6379）| docker compose |
 
 **Redis 端口注意**：compose.yml 用 `:6380` 而非 `:6379`，避让本机已有 Redis。改 compose 必须确认不冲突。
 
-**Admin 现状**：`src/admin/index.ts` 是 Phase 2 占位骨架，依赖（`@colyseus/admin`、`@colyseus/auth`）已装在 `package.json` 但**当前未接 Drizzle、未建 admin DB**。将来真做 admin 面板时，必须物理隔离库（参见 `src/admin/index.ts` 顶部架构规则）。
+**Admin 现状**：`src/admin/index.ts` 是 v2 占位骨架。**v2 路径（2026-09-14 决策）**：放弃 `@colyseus/admin` + `@colyseus/database` + Drizzle + 第二个 DB，改用 Refine standalone + 我们自己的 Fastify `/admin-ops/*` 路由 + MikroORM `admin` schema（同一 DB）。依赖 `@colyseus/admin` / `@colyseus/database` / `@colyseus/auth` 计划从 `package.json` 移除；移除前 ESList `no-restricted-imports` 兜底。详见 [`docs/admin-integration.md`](../../docs/admin-integration.md) v2。
 
 ---
 
@@ -44,7 +44,7 @@ src/
 ├── services/           # 业务服务层（解锁 / 种植 / 浇水 / 收获）
 ├── db/
 │   └── migrate.ts      # MikroORM migrations runner
-├── admin/              # @colyseus/admin 占位（ENABLE_ADMIN=0 时返 no-op；=1 时抛 AdminConfigError；Drizzle 库尚未引入）
+├── admin/              # v2 占位：ENABLE_ADMIN=0 时返 no-op；=1 时抛 AdminConfigError（v2 路径：Refine + /admin-ops/* 路由 + MikroORM admin schema；详见 docs/admin-integration.md）
 └── obs/                # pino / 指标
 test/
 ├── integration/        # 真实 PG：G1 9 + farm-room 12 + failover 3 + lease 10
@@ -94,12 +94,11 @@ db-init/                # 初始 SQL（角色 / 库）
 - `playerId` 与 `wechatCode` 完全解耦（ADR-0001）。
 
 ### 3.6 Admin（**当前未启用**）
-- `@colyseus/admin` 是 Phase 2 占位骨架（`src/admin/index.ts`）；
-- `ENABLE_ADMIN=0`（默认）：`/admin/healthz` 返 `enabled:false`，`/admin` 404；
-- `ENABLE_ADMIN=1`：**直接抛 `AdminConfigError`**（admin 子模块尚未实装）；
-- 业务代码（`auth|crop|player|farm|realtime/**`）**禁止** import `drizzle-orm` 或 `@colyseus/database`；
-- 真接入 admin 面板时再建第二个 DB（Drizzle 侧），与 MikroORM 库**物理隔离**；
-- Nginx 限制 `/admin/*` 内网访问。
+- `src/admin/index.ts` 是占位骨架；`mountAdmin()` 在 `ENABLE_ADMIN=0` 时挂 `/admin/healthz` 返 `{enabled:false}`，`ENABLE_ADMIN=1` 时抛 `AdminConfigError`（v2 待实装）；
+- 业务代码（`auth|crop|player|farm|realtime/**`）**禁止** import `drizzle-orm` / `@colyseus/database` / `@colyseus/admin`（计划从 `package.json` 移除这些依赖）；
+- **v2 路径（2026-09-14）**：Refine standalone + 我们自己的 Fastify `/admin-ops/*` 路由 + MikroORM `admin` schema；**不**引入第二个 ORM / 第二个 DB；
+- 详见 [`docs/admin-integration.md`](../../docs/admin-integration.md) v2（设计决策、迁移顺序、路由映射、文件清单）；
+- Nginx 限制 `/admin/*` 与 `/admin-ops/*` 仅内网访问。
 
 ---
 
@@ -163,7 +162,7 @@ node --import tsx scripts/seed-admin.ts       # Phase 3 admin seed
 - ❌ 改动协议层不更新 ADR；
 - ❌ 直接连 6379（必须 6380，避让本机）；
 - ❌ 把 `ENABLE_ADMIN` 设成 `1`（**当前 = 1 时抛 `AdminConfigError`**；admin 子模块尚未实装）；
-- ❌ 在业务代码 import `drizzle-orm` / `@colyseus/database`（admin 隔离规则，`src/admin/index.ts` 顶部）；
+- ❌ 在业务代码 import `drizzle-orm` / `@colyseus/database` / `@colyseus/admin`（admin v2 边界规则，`src/admin/index.ts` 顶部 + ESLint `no-restricted-imports` 兜底）；
 - ❌ 把 `JWT_SECRET` 写到代码 / 提交到 git。
 
 ---
@@ -175,6 +174,6 @@ node --import tsx scripts/seed-admin.ts       # Phase 3 admin seed
 - [`docs/adr/0003-g1-persistence-and-commands.md`](../../docs/adr/0003-g1-persistence-and-commands.md) — 持久化 / operationId / revision
 - [`docs/adr/0004-g2-ws-protocol-and-auth.md`](../../docs/adr/0004-g2-ws-protocol-and-auth.md) — WS 协议 + auth 门
 - [`docs/adr/0005-g2-realtime-ops.md`](../../docs/adr/0005-g2-realtime-ops.md) — 跨进程 / 容错 / D38-D43 故障矩阵
-- [`docs/admin-integration.md`](../../docs/admin-integration.md) — @colyseus/admin
+- [`docs/admin-integration.md`](../../docs/admin-integration.md) — Admin 面板架构（v2：Refine + Fastify `/admin-ops/*` + MikroORM `admin` schema）
 - [`docs/data-schema.md`](../../docs/data-schema.md) — 表结构
 - [`docs/state-sync.md`](../../docs/state-sync.md) — revision / optimistic

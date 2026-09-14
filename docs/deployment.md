@@ -12,20 +12,19 @@ Phase 1 在单台开发机上跑全部角色；Phase 2 起按角色拆分。
 |---|---|---|---|---|---|
 | api | 2 vCPU / 4 GB | farm-game-server | `node dist/index.js` | `GET /healthz` | 3000 |
 | ws | 2 vCPU / 4 GB | farm-game-server | `ENABLE_WS=1 node dist/realtime/serve.js` | `ws ready` | 2567 |
-| admin | 1 vCPU / 2 GB | farm-game-server | `ENABLE_ADMIN=1 node dist/admin.js` | `GET /admin/healthz` | 2568（**内网**） |
-| postgres-main | 2 vCPU / 4 GB | postgres:16 | `postgres -c shared_buffers=1GB` | `pg_isready` | 5432 |
-| postgres-admin | 1 vCPU / 2 GB | postgres:16（同集群不同 database） | 同上 | 同上 | 5432 |
+| admin (v2) | 1 vCPU / 2 GB | 独立 Refine web 包 | `pnpm --filter @farm-admin-web start`（待 v2 实装） | `GET /admin/healthz` | nginx 内网代理，无固定端口 |
+| postgres-farm-game | 2 vCPU / 4 GB | postgres:16 | `postgres -c shared_buffers=1GB` | `pg_isready` | 5432 |
 | redis | 1 vCPU / 2 GB | redis:7 | `redis-server --appendonly yes` | `PING` | 6379 |
 | nginx | 1 vCPU / 1 GB | nginx:1.27 | `nginx -g 'daemon off;'` | `GET /healthz` | 80 / 443 |
 
-**节点角色**与上文架构图一一对应：`api-1` / `ws-1` / `admin-1` 是进程角色，`postgres-main` / `postgres-admin` / `redis` / `nginx` 是基础设施。
+**节点角色**与上文架构图一一对应：`api-1` / `ws-1` 是进程角色，`postgres-farm-game` / `redis` / `nginx` 是基础设施。admin v2 是独立 web 包（不与 api 共享进程），由 Nginx 代理到内网 IP allow-list。详见 [`admin-integration.md`](./admin-integration.md) v2。
 
 ## 2. 起步：docker-compose.yml
 
 `packages/server/compose.yml` 已写满（Phase 2 启用）。 Phase 1 开发者本地直接：
 
 ```bash
-docker compose -f packages/server/compose.yml up -d postgres-main postgres-admin redis
+docker compose -f packages/server/compose.yml up -d postgres redis
 pnpm dev:server          # tsx watch
 ```
 
@@ -40,10 +39,10 @@ pnpm dev:server          # tsx watch
 | `HOST` | 0.0.0.0 | 否 | api 监听地址 |
 | `JWT_SECRET` | `dev-secret-change-me` | **生产必填** | 业务 JWT 签发 |
 | `JWT_SECRET_ADMIN` | `dev-admin-secret-change-me` | **生产必填** | admin JWT |
-| `SESSION_SECRET` | `dev-session-change-me` | **生产必填** | @colyseus/auth cookie |
-| `MAIN_DB_URL` | null | Phase 2 | `postgres://user:pw@host:5432/main` |
-| `ADMIN_DB_URL` | null | Phase 2 | `postgres://user:pw@host:5432/admin` |
-| `ENABLE_ADMIN` | 0 | 否 | 1 = 挂载 @colyseus/admin（要求 ADMIN_DB_URL 已就绪） |
+| `SESSION_SECRET` | `dev-session-change-me` | **生产必填** | 预留；v2 admin 自建简单 JWT 时可作备用 cookie 密钥（暂未使用） |
+| `MAIN_DB_URL` | null | Phase 2 | `postgres://user:pw@host:5432/farm_game` |
+| `ADMIN_DB_URL` | — | **已废弃** | v2 不再有第二个 DB；admin 与业务共用 `postgres-farm-game`（admin schema）。该变量即使保留也会被忽略 |
+| `ENABLE_ADMIN` | 0 | 否 | 1 = 挂载 `/admin-ops/*` 路由 + Refine 前端可用（v2 待实装，详见 [`admin-integration.md`](./admin-integration.md) v2） |
 | `LOG_LEVEL` | info | 否 | pino 等级 |
 
 ## 4. 支付回调安全（Phase 2 启用）
@@ -62,7 +61,7 @@ pnpm dev:server          # tsx watch
 |---|---|---|
 | api | PM2 `reload`（零停） | 进程间不共享内存；reload 期间新流量由其它实例接管 |
 | ws | graceful：`onDispose()` flush 所有房间状态到 Postgres | Colyseus 自动禁止新连接，旧连接允许完成当前消息 |
-| admin | **先停再启** | rate limiter 状态丢失可接受；不在负载峰值期 |
+| admin (v2) | **先停再启**（独立 web 包） | 独立的 Refine SPA，状态丢失可接受；不在负载峰值期 |
 | postgres | 主从切换需手工 | Phase 4 起启用主从 |
 | redis | 主从切换需手工 | Phase 4 起启用主从 |
 
@@ -74,11 +73,25 @@ pm2 reload ws-1   # reload 当前实例
 # 再 reload ws-2
 ```
 
-### Admin 节点首次启动流程（Phase 3）
+### Admin v2 首次启动流程（待实装）
+
+详见 [`admin-integration.md`](./admin-integration.md) v2 §4 迁移顺序。简版：
 
 ```bash
-ADMIN_DB_URL=... ENABLE_ADMIN=1 pnpm seed-admin   # 占位脚本，Phase 3 实装
-pm2 start dist/admin.js --name admin-1
+# 1) 单一 migration 增加 admin schema
+pnpm --filter @farm-game/server db:migrate
+
+# 2) 创建首个 admin 用户（脚本占位）
+pnpm --filter @farm-game/server seed:admin-user --username root
+
+# 3) 部署 Refine 前端 web 包（独立部署到内网）
+pnpm --filter @farm-admin-web build && pnpm --filter @farm-admin-web deploy
+
+# 4) Nginx 加 /admin/* 路由 + 内网 IP allow-list
+sudo nginx -t && sudo systemctl reload nginx
+
+# 5) 启用 ENABLE_ADMIN=1，重启 api 进程
+ENABLE_ADMIN=1 sudo systemctl restart farm-api
 ```
 
 ## 6. 观测
@@ -99,7 +112,7 @@ pm2 start dist/admin.js --name admin-1
 - `farm_http_request_duration_seconds_bucket{...}`
 - `farm_ws_connections{room}`
 - `farm_db_pool_acquire_seconds{db}`
-- `farm_admin_rate_limited_total`
+- `farm_admin_ops_request_total{op}`（v2 实装后启用）
 
 ### 告警阈值
 
@@ -112,11 +125,8 @@ pm2 start dist/admin.js --name admin-1
 
 | 数据 | 备份方式 | RTO | RPO |
 |---|---|---|---|
-| postgres-main | `pg_dump` + WAL archiving | 1h | 5min |
-| postgres-admin | `pg_dump`（24h 一次） | 24h | 24h |
+| postgres-farm-game | `pg_dump` + WAL archiving | 1h | 5min（admin schema 与 public schema 同一 DB，统一备份） |
 | redis | AOF rewrite + RDB snapshot | 30min | 0（重启丢失活跃会话） |
-
-admin DB 可容忍 24h 数据丢失（只存用户/审计，业务数据在 main）。
 
 ## 8. 系统调优（参考 PRD §7.4）
 
@@ -130,7 +140,7 @@ net.ipv4.tcp_tw_reuse = 1
 ## 9. 上线 checklist
 
 - [ ] `pnpm -r build && pnpm -r test && pnpm smoke` 三件套全过
-- [ ] `ENABLE_ADMIN=0` 默认关闭；开启前必须 `pnpm seed-admin`
+- [ ] `ENABLE_ADMIN=0` 默认关闭；开启前必须完成 [`admin-integration.md`](./admin-integration.md) v2 §4 的 10 步迁移顺序（包括 seed admin user）
 - [ ] JWT_SECRET / JWT_SECRET_ADMIN / SESSION_SECRET 均已从环境注入且不在源码
 - [ ] nginx `/admin/*` 限制内网 IP
 - [ ] Prometheus scrape 配置就绪

@@ -159,7 +159,7 @@ pnpm --filter @farm-game/server demo:loop
 - [ ] `pnpm --filter @farm-game/server smoke:realtime` 全过
 - [ ] 你能说出 `playerId` / `operationId` / `revision` 三个 ID 各是什么用途
 - [ ] 你能说出 `@farm-game/shared` 是"协议契约唯一来源"
-- [ ] 你能说出"只有 MikroORM 一个 ORM，不要加 drizzle-orm"
+- [ ] 你能说出"只有 MikroORM 一个 ORM；admin v2 也走 MikroORM（admin schema），**不要**加 `@colyseus/admin` / `drizzle-orm` / 第二个 DB"
 - [ ] 你能说出"wx-compat 三件套必须在 SDK import 前求值"
 - [ ] 你能说出"asset meta 必须 texture→sprite-frame，否则 boot failed"
 
