@@ -59,15 +59,17 @@ export interface ServerConfig {
 
   /** JWT signing secret for business routes. */
   jwtSecret: string;
-  /** JWT secret for @colyseus/admin panel. */
+  /** JWT secret for admin ops (separate namespace; ADR-0006 D46/D50). */
   jwtSecretAdmin: string;
   /** Session secret used by @colyseus/auth for cookie signing. */
   sessionSecret: string;
   /** JWT issuer (`iss` claim) and audience (`aud` claim). */
   jwtIssuer: string;
   jwtAudience: string;
-  /** JWT TTL in seconds. */
+  /** JWT TTL in seconds (business routes). */
   jwtTtlSec: number;
+  /** JWT TTL in seconds for admin ops (ADR-0006 D50: 1-4h, default 2h). */
+  jwtTtlSecAdmin: number;
 
   /** ENABLE_ADMIN=1 mounts @colyseus/admin on the WS node. Default off. */
   enableAdmin: boolean;
@@ -111,6 +113,21 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   if (!Number.isFinite(jwtTtlSec) || jwtTtlSec <= 0) {
     throw new ConfigError(
       `JWT_TTL_SEC must be a positive integer (received ${process.env.JWT_TTL_SEC ?? '<unset>'}). Refusing to start.`,
+    );
+  }
+  const jwtTtlSecAdmin = Number(process.env.JWT_TTL_SEC_ADMIN ?? '7200');
+  if (!Number.isFinite(jwtTtlSecAdmin) || jwtTtlSecAdmin <= 0) {
+    throw new ConfigError(
+      `JWT_TTL_SEC_ADMIN must be a positive integer (received ${process.env.JWT_TTL_SEC_ADMIN ?? '<unset>'}). Refusing to start.`,
+    );
+  }
+  if (jwtTtlSecAdmin < 3600 || jwtTtlSecAdmin > 4 * 3600) {
+    // ADR-0006 D50: admin TTL should sit in [1h, 4h]. Warn at boot rather
+    // than fail — a longer value may be intentional during a roll-out of
+    // a long session while a shorter one would be a misconfig.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[config] JWT_TTL_SEC_ADMIN=${jwtTtlSecAdmin} is outside the recommended 1–4h window from ADR-0006 D50.`,
     );
   }
 
@@ -217,6 +234,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     jwtIssuer,
     jwtAudience,
     jwtTtlSec,
+    jwtTtlSecAdmin,
     enableAdmin,
     enableMockAuth,
     ...overrides,
