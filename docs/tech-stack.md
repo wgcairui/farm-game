@@ -50,8 +50,7 @@
 |---|---|---|
 | HTTP 框架 | Fastify 5 | 高性能、QPS 30k+、TypeScript 一等公民 |
 | WebSocket | Colyseus 0.18（Phase 2 实装） | 官方支持房间管理；uWebSockets.js 传输层 |
-| 业务 ORM | **MikroORM 6** | Data Mapper + Unit of Work，批量性能优；与 PRD §3.5 一致 |
-| Admin ORM | Drizzle（@colyseus/database 强依赖） | 仅 admin 范围使用；不接触业务表 |
+| 业务 ORM | **MikroORM 6** | Data Mapper + Unit of Work，批量性能优；与 PRD §3.5 一致。**唯一 ORM**（admin v2 也用 MikroORM 的 `admin` schema，详见 [admin-integration.md](./admin-integration.md) v2） |
 | 数据库 | PostgreSQL 16 | 事务、JSONB、并发 |
 | 缓存 / Presence | Redis 7（Phase 2） | Presence、Driver、Session、限流 |
 | 进程管理 | PM2 fork | 每核一进程，独立端口 |
@@ -140,4 +139,4 @@ packages/client-app/src/
 - [ ] 时间戳改到 2030 年不会刷钱（TimeManager + 服务端校验）
 - [ ] 仓库满时收获不丢失
 - [ ] 没有 console.log 漏在生产（pino logger 兜底）
-- [ ] `@colyseus/admin` 关闭时 `/admin/*` 返回 404（已有单测守护）
+- [ ] `ENABLE_ADMIN=0` 默认关闭；开启前必须完成 [`admin-integration.md`](./admin-integration.md) v2 §4 迁移顺序（`/admin/healthz` 返 `{enabled:false}`，已有单测守护）

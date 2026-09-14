@@ -1,12 +1,14 @@
 /**
- * Drizzle table definitions for the admin DB — Phase 2.
+ * Admin schema placeholder — v2 路径。
  *
- * Schema listed here so Phase 2 reviewers can see the planned surface area:
- *   - admin_users      (id, username, password_hash, created_at, last_login_at)
- *   - admin_sessions   (id, user_id, expires_at, revoked_at)
- *   - admin_audit_log  (id, user_id, action, target, payload_jsonb, created_at)
+ * v1 计划（Drizzle table definitions for `@colyseus/admin`）已废弃（2026-09-14）。
+ * v2 计划：实体作为 MikroORM entities 落在 `src/db/entities/admin/`
+ *   - `AdminUser.ts`      (id, username, password_hash, created_at, last_login_at)
+ *   - `AdminAuditLog.ts`  (id, admin_user_id, action, target_player_id, payload_jsonb, created_at)
+ *   - `AdminSession.ts`   (可选，stateless JWT 模式可以不要)
  *
- * Phase 1: no actual table definitions; file exists so the boundary is explicit.
+ * 所有 admin entities 属于同一个 Postgres DB 的 `admin` schema（同一份 MikroORM 连接）。
+ * 详见 [`docs/admin-integration.md`](../../../../docs/admin-integration.md) v2。
  */
 
 export const AdminTablesPhase2 = {

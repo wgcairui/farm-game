@@ -32,10 +32,7 @@
     "smoke:realtime": "node --import tsx scripts/smoke-realtime.ts"
   },
   "dependencies": {
-    "@colyseus/admin": "0.18.5",
-    "@colyseus/auth": "0.18.2",
     "@colyseus/core": "0.18.12",
-    "@colyseus/database": "0.18.3",
     "@colyseus/redis-driver": "0.18.2",
     "@colyseus/redis-presence": "0.18.4",
     "@colyseus/ws-transport": "^0.18.2",

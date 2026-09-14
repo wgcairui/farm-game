@@ -46,25 +46,28 @@
 │   │  api-1 (Fastify HTTP)  │   ...   │  ws-1 (Colyseus WS)    │  ...    │
 │   │  /auth, /player,       │         │  FarmRoom (Phase 2)    │         │
 │   │  /crop, /farm,         │         │                        │         │
-│   │  /healthz              │         │  admin-1 (colyseus     │         │
-│   │                        │         │  + @colyseus/admin)    │         │
-│   │  PM2 fork 模式         │         │  ENABLED ONLY IN        │         │
-│   │  instances = cpus      │         │  ENABLE_ADMIN=1 mode   │         │
+│   │  /admin-ops/* (v2)     │         │  (admin ops 共用         │         │
+│   │  /healthz              │         │   matchMaker.* API)    │         │
+│   │  PM2 fork 模式         │         │                        │         │
+│   │  instances = cpus      │         │                        │         │
 │   └──────────┬─────────────┘         └──────────┬─────────────┘         │
 └──────────────┼──────────────────────────────────┼───────────────────────┘
-               │ MikroORM                          │ Drizzle (admin only)
+               │ MikroORM (public schema)          │ MikroORM (无 schema 差异)
                ▼                                   ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                              数据 (Data)                                 │
 │   ┌──────────────────────┐  ┌──────────────────────┐  ┌─────────────────┐  │
-│   │  postgres-main       │  │  postgres-admin      │  │     redis       │  │
-│   │  (MikroORM 管理)     │  │  (Drizzle 管理,      │  │  (Presence,     │  │
-│   │  players / plots /   │  │   仅供 @colyseus/    │  │   Driver, 缓存) │  │
-│   │  steal_records /     │  │   admin 使用)        │  │                 │  │
-│   │  crop_configs        │  │  admin_users /       │  │                 │  │
-│   │                      │  │  sessions /          │  │                 │  │
-│   │                      │  │  audit_log           │  │                 │  │
-│   └──────────────────────┘  └──────────────────────┘  └─────────────────┘  │
+│   │  postgres-farm-game     │                            │     redis       │  │
+│   │  (单 DB, MikroORM 管理) │                            │  (Presence,     │  │
+│   │  schema: public         │                            │   Driver, 缓存) │  │
+│   │   players / plots /     │                            │                 │  │
+│   │   auth_identities /     │                            │                 │  │
+│   │   operation_receipts /  │                            │                 │  │
+│   │   farm_room_leases      │                            │                 │  │
+│   │  schema: admin (v2)     │                            │                 │  │
+│   │   admin_users /         │                            │                 │  │
+│   │   admin_audit_log       │                            │                 │  │
+│   └─────────────────────────┘                            └─────────────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
                 ┌────────────────────────────────────────────┐
                 │                观测 (Obs)                │
@@ -93,7 +96,7 @@
 |---|---|---|---|---|---|
 | api (Fastify HTTP) | 业务 REST | HTTPS/JSON | 3000 | 进程（PM2 fork） | MikroORM main DB |
 | ws (Colyseus WS) | 实时房间 | WSS | 2567 | 进程 | Redis Presence, RedisDriver |
-| admin (colyseus+admin) | 后台面板 | 同 ws 进程 | 2568 (内网) | 进程 | @colyseus/database (Drizzle) |
+| admin (v2) | 后台面板 | HTTPS/JSON + 独立 Refine 前端 | 与 api 同进程 `/admin-ops/*`;前端静态资源 Nginx 内网 | 进程 | MikroORM（admin schema，同 DB）|
 | crop-config (HTTP) | 作物配置 | HTTPS/JSON | 同 api | 同 api | 无（共享常量） |
 | auth (HTTP) | 登录/JWT | HTTPS/JSON | 同 api | 同 api | wx/oAuth 第三方 |
 | friend (WS+HTTP) | 好友/偷菜（Phase 2） | WSS+HTTPS | 同 ws/api | 同上 | ws 房间, redis cache |
@@ -103,13 +106,14 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 
 ## 5. 数据分区
 
-两块 PostgreSQL database + 一块 Redis（同 cluster、不同 database 名）：
+**单 PostgreSQL database + 一块 Redis**（admin 路径 v2：Refine + Fastify + MikroORM admin schema，详见 [admin-integration.md](./admin-integration.md)）：
 
-- **postgres-main** — MikroORM 管理，承载 `players` / `farm_plots` / `steal_records` / `crop_configs` / `friend_*` 等业务表；连接池 `min:2 max:15`
-- **postgres-admin** — Drizzle（经 `@colyseus/database`）管理，承载 `admin_users` / `admin_sessions` / `admin_audit_log`；连接池 `min:2 max:10`
+- **postgres-farm-game** — MikroORM 管理，承载全部表：
+  - **schema `public`**（业务）：`players` / `farm_plots` / `steal_records` / `crop_configs` / `friend_*` / `auth_identities` / `operation_receipts` / `farm_room_leases`；连接池 `min:2 max:15`
+  - **schema `admin`**（v2 后台）：`admin_users` / /admin_audit_log（可选 `admin_sessions`）；共用同一 MikroORM 连接的 EM（不单独配连接池）
 - **redis** — Presence（房间成员）、Driver（房间元数据）、缓存（排行榜/限流）
 
-**严禁跨库 FK**。admin 引用业务 openid 用字符串字段，不在 DB 层加外键。详见 [admin-integration.md](./admin-integration.md)。
+**严禁跨库 FK**（v1 时代的多 DB 时代规则已废；现在只有一个 DB，谈不上跨库）。admin 引用业务 `player_id` 用字符串字段，DB 层无外键。详见 [admin-integration.md §3](./admin-integration.md)。
 
 ## 6. 客户端 → 服务端会话生命周期
 
@@ -149,9 +153,9 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 - **JWT**：HS256，业务 secret 与 admin secret 分开；TTL 7 天（`JWT_TTL_SEC`）；`iss=farm-game`、`aud=client`；标准 `sub`/`iat`/`exp` 由 `@fastify/jwt` 校验
 - **协议版本**：`x-protocol-version` header major 不匹配 → HTTP 426 `PROTOCOL_VERSION_MISMATCH`
 - **WS**：握手携带 JWT，连接即校验 `sub`（playerId） 与 platform
-- **Admin**：默认 2568 端口内网访问；Nginx `allow 10.0.0.0/8; deny all;`
+- **Admin（v2）**：`/admin-ops/*` 路由 + Refine 前端独立部署；Nginx `allow 10.0.0.0/8; deny all;` 限制内网访问；admin JWT 用 `jwtSecretAdmin`（与业务 secret 物理分离，见 [`config.ts`](../../packages/server/src/config.ts)）
 - **支付回调**：HMAC 签名 + nonce 防重放；详见 [deployment.md §4](./deployment.md)
-- **数据隔离**：admin DB 不接触业务表，业务代码不接触 admin ORM；ESLint `no-restricted-imports`（Phase 3 启用）
+- **数据隔离**：单 DB + 单 ORM，admin 用 `admin` schema；ESLint `no-restricted-imports` 挡 `drizzle-orm` / `@colyseus/database` / `@colyseus/admin` 在业务代码（admin 代码本身允许 MikroORM，因为 admin 也用同一 ORM）
 - **生产启动 fail-closed**：默认 secret 在 production 启动时抛 `ConfigError`；`ENABLE_MOCK_AUTH=1` 在 production 启动时抛 `ConfigError`
 - **Mock 隔离**：mock login 仅在 `NODE_ENV ∈ {development, test}` + 显式 `ENABLE_MOCK_AUTH=1` 时启用
 
@@ -175,7 +179,7 @@ Fastify HTTP 与 Colyseus WS 永远独立进程（uWebSockets.js 不可与 Fasti
 | 单测总计（shared 31 + server 44 + client-mini 28 + client-app 7） | ✅ 110/110 |
 | **client-mini 联网层（G3）**：FarmHttpClient（wx.request/fetch 双 transport）+ FarmRealtimeClient（**@colyseus/sdk 0.18.2** + wx-compat 适配层）+ OnlineGameApp（服务端权威 + 乐观回滚 + revision 守卫 + 退避重连） | ✅ G3（commit `9ef7c24`） |
 | **微信开发者工具模拟器 E2E**：登录 → join → 种植（−10 金）→ 30s 成熟 → 收获（+25 金），DB 断言全程一致，重编译状态保留 | ✅ G3（2026-09-12，见 runbook §10） |
-| `@colyseus/admin` 隔离子模块（ENABLE_ADMIN=0 默认） | ✅ 占位 + 拒绝策略 |
+| `Admin` 路径 v2 锁定（Refine standalone + Fastify `/admin-ops/*` + MikroORM `admin` schema，**不再**引入 `@colyseus/admin` / Drizzle / 第二个 DB） | ✅ 设计决策（2026-09-14，详见 [admin-integration.md](./admin-integration.md)） |
 | 真实微信 jscode2session + Apple/Google id_token 验证 | ⌛ G1.5 |
 | wx transport 真机回归（wx-compat 已覆盖 send 帧与构造形；真机网络栈待实测） | ⌛ G4 |
 | 发布链路收口（包体/图集优化、上线流程、DELIVERY 追加） | ⌛ G4 |
