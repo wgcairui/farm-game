@@ -88,9 +88,19 @@ python3 scripts/slice-assets.py
 node scripts/fix-cocos-sprite-metas.mjs     # texture→sprite-frame，否则首个 key 就 boot failed
 node scripts/patch-wechat-build.mjs         # 微信构建补丁
 node scripts/patch-release-build.mjs        # release 包补丁
+
+# 5. minimax 直出新按钮 sprite（M6/M7 pattern）—— runbook §11.11
+zsh -lic 'python3 /tmp/gen_side_btns.py'        # 7 张 button PNG 直出 + PIL alpha-key
+python3 /tmp/gen_sprite_meta.py <png...>         # 写 sprite-frame .meta（无 .meta 的新文件）
+
+# 6. funplay-cocos-mcp 调试（main agent only）—— runbook §11.12
+#    一次性装：见 §11.12①；.gitignore 加 extensions/ + funplay-cocos-mcp.config.json
+#    一次性流程：set_preview_mode gameView → run_project_preview → 
+#    execute_scene_script context=scene code="..." (attach OnlineFarm) → 
+#    capture_game_screenshot outputPath=/tmp/shot.png
 ```
 
-完整流程见 [`docs/cocos-runbook.md`](./docs/cocos-runbook.md)（§10 联调坑必读）。
+完整流程见 [`docs/cocos-runbook.md`](./docs/cocos-runbook.md)（§10 联调坑必读 + §11.11 sprite 双层 pattern + §11.12 MCP 调试经验）。
 
 ---
 

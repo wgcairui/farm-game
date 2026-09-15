@@ -90,3 +90,8 @@ report.*.json
 # 临时 probe 脚本（不入库；保留 farm-sim-probe.mjs 作为合法探针）
 scripts/farm-automator-*-probe*.mjs
 scripts/farm-probe[0-9]*.mjs
+
+# Cocos MCP 调试工具栈 — funplay-cocos-mcp 是插件（symbol 到 ~/.CocosCreator/builtin-extensions），
+# config 是本机配置，都不入库（runbook §11.12①）
+packages/client-mini/extensions/
+packages/client-mini/funplay-cocos-mcp.config.json

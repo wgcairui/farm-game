@@ -662,3 +662,134 @@ Cocos CLI 构建**成功也会以非 0 退出码结束**（子进程 SIGTERM 收
 | Release build (debug=false) | ✅ 7.3MB（debug 11MB），但仍超 4MB |
 | G4 真机上传 | ❌ **80051 / 4MB 限制**（G4 阻塞，需 GUI 引擎裁剪） |
 | 模拟器视觉验收（debug 模拟器） | ⚠️ 受 debug 浮层 + sprite outline + frame cache 延迟干扰，不能做最终视觉基线 |
+
+### 11.11 Sprite 双层 pattern（button + icon，2026-09-14 M6/M7 实战）
+
+**核心**：所有「彩色圆角按钮 + 中心图标」都必须用 **2 个独立 sprite 叠加**——一个 button sprite（圆角方块/胶囊，纯色 + 渐变高光）、一个 icon sprite（白底/纯色居中）。代码层 `kitButton`/`railButton`/`Nav_*` 都是「先建 hit 节点 → 上 button sprite → 上 icon sprite（中心） → 加 label」三步走。
+
+为什么不用单 sprite + 程序化 roundRect：
+
+- 程序化 `roundRect()` 画的 bg + sprite icon 混在一起，缩放后 bg 圆角变形、icon 不在视觉中心
+- 单 sprite 的按钮要换色/换图标必须重新出图
+- 双层可以**单换图标**（A/B 测试）/ **单换底色**（节日皮肤），不重新出图
+
+**M6 底部 4 键 tabbar**（仓库/商店/宠物/装扮，4 色）：
+
+- 4 张 button PNG：`ui_btn_tabbar_{red,orange,blue,green}.png`（1024×1024，minimax 直出 + PIL alpha-key 240）
+- 4 张 icon PNG：`icons/ui_icon_{crate,market,paw,palette}.png`（同源同工艺）
+- `layout.ts` 加 `navBtnKeys[]` / `navIconKeys[]` / `navIconSize=64` / `navIconLiftY=4` 四个常量
+- `bottomBar.ts` 把 for 循环改为每键取 `frames[btnKey]` / `frames[iconKey]` 双 sprite
+- label 白字 `(255,255,255)` + 黑描边 `outlineWidth=2 / outlineColor=(40,30,20)`，在 4 色底上都可见
+
+**M7 侧栏 7 键**（左 4 分享/音乐/菜单/相机 + 右 3 商城/萌宠/提篮，**7 色**）：
+
+- 7 张 button PNG：`ui_btn_side_{share,music,menu,camera,shop,pet,basket}.png`（避免和 tabbar 4 色撞色，每按钮独立色匹配动作语义）
+- icon 复用现有 kit（share/music/menu/camera/shop/pet/seed_bag），**未重出**
+- `layout.ts` 把 `sideBtns[i] / leftBtns[i]` 重构为 `{ btnKey, iconKey, top, label }`；加 `sideBtnIconSize=72` + `leftBtnIconSize=60`
+- `sideColumn.ts` 同样双层；disabled 按钮双 sprite 都 `setOpacity(0.6)`
+- 7 色 palette（写进记忆，方便复用）：
+
+  | 按钮 | hex | 色彩名 |
+  |---|---|---|
+  | 分享 share | `#4FC3D9` | teal cyan |
+  | 音乐 music | `#9B6BD9` | soft purple |
+  | 菜单 menu  | `#5C6680` | slate gray |
+  | 相机 camera| `#E66B9C` | soft pink |
+  | 商城 shop  | `#F5C242` | warm gold |
+  | 萌宠 pet   | `#6BD9A3` | mint green |
+  | 提篮 basket| `#F0944D` | warm orange |
+
+**minimax image-01 直出 PNG 全流程**（不需要 MCP 中转，可脚本批跑 7+ 张）：
+
+```bash
+# 1) key 必须在 interactive zsh env（memory: minimax API key 安全）
+zsh -lic 'python3 /tmp/gen_side_btns.py'   # /tmp/gen_side_btns.py 见下
+```
+
+`/tmp/gen_side_btns.py` 流水线：
+
+1. 调 `https://api.minimax.chat/v1/image_generation` REST（`Authorization: Bearer $MINIMAX_API_KEY`），`response_format: base64`，**注意返回是 `data.image_base64` 数组**（不是 `data.images`，已踩过）
+2. PIL 解码 → 转 RGBA → R/G/B 全 ≥ 240 像素 α=0（白底 key 掉，threshold=240 比 255 更稳，能去 minimax 的 #F8–#FE 灰边）
+3. 写到 `packages/client-mini/assets/resources/game/{ui,icons}/<name>.png`
+
+**新 PNG 的 sprite-frame .meta 一条龙**：
+
+```bash
+node scripts/fix-cocos-sprite-metas.mjs   # 只对老 PNG（已有 texture meta）有效
+# 新文件无 .meta：用 /tmp/gen_sprite_meta.py（写全新 .meta，包含 texture 6c48a + sprite-frame f9941 子资源）
+python3 /tmp/gen_sprite_meta.py packages/client-mini/assets/resources/game/ui/ui_btn_side_*.png
+```
+
+不写 sprite-frame .meta → Cocos 加载时报 `Bundle resources doesn't contain game/<key>/spriteFrame` → boot failed 全屏蓝（§11.7）。
+
+**`assets.ts` 必须同步加 key**，否则 `loadAll()` 不请求这张图，浪费导入时间。键名规则：`ui/ui_btn_<group>_<color>` / `icons/ui_icon_<name>`，避免和 kit 命名冲突。
+
+### 11.12 funplay-cocos-mcp 调试 + asset DB sync 坑（2026-09-14 实战沉淀）
+
+**①装 + 接 + 启（一次性）**
+
+```bash
+# clone to Cocos builtin-extensions
+git clone https://github.com/FunplayAI/funplay-cocos-mcp \
+  ~/.CocosCreator/builtin-extensions/3.8.8/funplay-cocos-mcp
+# 软链到项目（避免 .gitignore 黑名单外泄到仓库）
+ln -s ~/.CocosCreator/builtin-extensions/3.8.8/funplay-cocos-mcp \
+  packages/client-mini/extensions/funplay-cocos-mcp
+# 关键：必须写 funplay-cocos-mcp.config.json 把 toolProfile 提到 "full"
+cat > packages/client-mini/funplay-cocos-mcp.config.json <<'EOF'
+{ "toolProfile": "full", "host": "127.0.0.1", "port": 22143,
+  "portMode": "project", "autostart": true,
+  "executeJavascriptSafetyChecks": true }
+EOF
+# ZCode MCP client 配置（~/.zcode/cli/config.json）
+"funplay_cocos": { "type": "http", "url": "http://127.0.0.1:22143/",
+                   "enabled": true }
+# 启动 Cocos（会自动起 MCP server）
+/Applications/Cocos/Creator/3.8.8/CocosCreator.app/Contents/MacOS/CocosCreator \
+  --project /Users/cairui/Code/farm-game/packages/client-mini
+```
+
+- 默认 `toolProfile: "core"` 只暴露 39 工具；`capture_game_screenshot` / `run_project_preview` / `refresh_assets` 等都在 `full` profile（共 105 工具）。
+- `toolProfile: "full"` 改了之后必须**重启 Cocos** 才生效（插件启动时一次性读 config）。
+- `extensions/funplay-cocos-mcp` 是**符号链接**到 `~/.CocosCreator/builtin-extensions/`，加进 `.gitignore`（`packages/client-mini/extensions/`）——它是工具不是游戏资产。
+- `funplay-cocos-mcp.config.json` 也加 `.gitignore`，是本机 MCP 配置不入库。
+
+**②核心工具用法（主 agent 用，subagent 不调）**
+
+```javascript
+// 1) 切到 gameView（不是 browser / simulator）
+mcp tools/call set_preview_mode {"mode":"gameView"}
+
+// 2) 启动 preview（等 6s 让游戏加载完成）
+mcp tools/call run_project_preview {}    // 首次可 forceRestart=true
+
+// 3) 关键：先让 OnlineFarm 挂到 Canvas（场景默认空）
+mcp tools/call execute_scene_script {
+  context: "scene",
+  code: "(function(){const c=cc.find('Canvas');const ex=c.getComponent('OnlineFarm');if(ex){if(!ex.enabled){ex.enabled=true;if(ex.onLoad)ex.onLoad();}return;}c.addComponent('OnlineFarm').onLoad();})()"
+}
+
+// 4) 截图（M6/M7 用这条验证 tabbar + 侧栏 7 按钮）
+mcp tools/call capture_game_screenshot {"outputPath":"/tmp/shot.png"}
+```
+
+**踩过的参数名坑**：
+
+- `execute_scene_script` 的参数是 **`code`** 不是 `script`（用 `script` 直接报 "code is required"）
+- `refresh_assets` 接 `paths: [...]`，**路径用仓库相对路径不带 `db://`**（如 `"assets/resources/game/ui"` 不是 `"db://assets/resources/game/ui"`）
+- `run_project_preview` 不接 `forceRestart` 默认就 restart，传了反而有时 hang
+
+**③asset DB sync 死锁（本次会话卡住的真凶，§11.10 截图盲点之后第二个工具栈坑）**
+
+- 现象：手写 7 张新 PNG + `.meta` 写到 `assets/resources/game/ui/`，Cocos 启动后 `require('@editor/asset-db').forEach(cb)` 始终返回 **0**，但 `library/.assets-info.json` 在每次 `refresh_assets` 后都被 Cocos 重写（262 个目录条目含全部 ui 文件）。
+- 后果：runtime `cc.assetManager.assets` 也只有 111 个（engine builtins），`bundles` 列表只有 `["internal"]`，**0 个项目 sprite 被加载**。OnlineFarm.onLoad() 走到 `loadAll` 就 reject → sideColumn/bottomBar 全 null，但 status label 被后续 "已连接服务端" 覆盖，看不到失败原因。
+- 试遍无效：`adb.refresh` / `adb.reimport` / `save_current_scene` / `cc.resources.loadDir("game/ui")` / `cc.assetManager.loadBundle("resources")` / `pkill && rm -rf library/ && cold restart` —— in-memory cache 永远不装载。
+- **结论**：本会话的 MCP singleton 引用了一个未被进程初始化的 DB 实例；disk .assets 已被 Cocos 重写过说明 Cocos 在做 scan，但 MCP 侧拿不到结果。
+- **绕过**：让用户在新开 Cocos 会话里手验（截图 §11.8 / 桥 dump §11.4），或者直接 commit + push（**M6/M7 commit cc92afc / 5aff3fc 已落地，代码侧 29/29 测试 + tsc 全绿**）。
+- **教训**：MCP 工具栈不靠谱时**别死磕**——disk 上 .assets 能验出来就够说明 Cocos 看到了文件；runtime 能不能 load 是引擎 startup 顺序问题，不是文件问题。下次开工先 `pkill` + `rm -rf library/` + 冷启，等 Cocos 跑完首屏（菜单/资源管理器都画出来）再接 MCP。
+
+**④GUI 操作只在 main agent**
+
+- WebView 菜单里的「打开项目 / 编译 / 触发 asset 重导入」等按钮**无法**用 CGEvent / AppleScript 点（Electron WebView 不响应），必须 main agent 在 macOS GUI 里点。
+- ZCode subagent 用 `Agent` 工具委派只能做**只读 / 编辑**任务，GUI 操作（点击 WebView、微信开发者工具 IDE 授权弹窗）全部 main agent 自己来。
+- 本会话已踩：wechatide 工具面的 GUI 授权（§11.8）以及 funplay-cocos-mcp 的「编辑器编译按钮」都属此类。
